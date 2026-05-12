@@ -39,7 +39,11 @@
           <h1 class="text-xl font-bold">Side-by-Side Trials</h1>
           <p id="user-email" class="text-xs text-stone-500"></p>
         </div>
-        <div class="flex gap-2">
+        <div class="flex gap-2 items-center">
+          <label class="flex items-center gap-2 text-xs text-stone-600 mr-2">
+            <input id="f-show-deleted" type="checkbox" class="h-4 w-4 rounded border-stone-400 text-emerald-600" />
+            Show deleted
+          </label>
           <a href="index.html" class="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm">New Entry</a>
           <button id="export-csv" class="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm">Export CSV</button>
           <button id="logout-btn" class="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm">Sign out</button>
@@ -302,6 +306,9 @@
     .num { text-align: right; font-variant-numeric: tabular-nums; }
     .pos { color: rgb(5 150 105); }
     .neg { color: rgb(220 38 38); }
+    #tbody tr.trial-deleted { background: rgb(254 242 242); color: rgb(120 113 108); }
+    #tbody tr.trial-deleted td { text-decoration: line-through; text-decoration-color: rgb(220 38 38); }
+    #tbody tr.trial-deleted:hover { background: rgb(254 226 226); }
   </style>
 </body>
 </html>

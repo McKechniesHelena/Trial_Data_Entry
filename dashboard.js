@@ -16,6 +16,7 @@
   let productExclusive = false;
   let costOverride = null; // number or null
   let cropPrices = loadCropPrices();
+  let showDeleted = false;
 
   function costOverrideActive() {
     return productExclusive && selectedProducts.size > 0 && Number.isFinite(costOverride);
@@ -108,15 +109,12 @@
 
   // ---------- DATA ----------
   async function loadData() {
-    const { data, error } = await supabase
-      .from("trials")
-      .select("*")
-      .is("deleted_at", null)
-      .order("key_id", { ascending: false })
-      .limit(10000);
+    let q = supabase.from("trials").select("*")
+      .order("key_id", { ascending: false }).limit(10000);
+    if (!showDeleted) q = q.is("deleted_at", null);
+    const { data, error } = await q;
     if (error) { alert("Error loading data: " + error.message); return; }
     allRows = data ?? [];
-    // Pre-parse products once per row so filters/render don't redo work.
     for (const r of allRows) r._products = parseProducts(r.treatment_with_rate);
     populateFilters(allRows);
     populateProductsList();
@@ -337,7 +335,9 @@
     });
 
     const tbody = document.getElementById("tbody");
-    tbody.innerHTML = sorted.map(r => `<tr data-id="${escapeHtml(r.id)}" class="cursor-pointer">` + COLS.map(([k, _, type, mode]) => {
+    tbody.innerHTML = sorted.map(r => {
+      const rowClass = "cursor-pointer" + (r.deleted_at ? " trial-deleted" : "");
+      return `<tr data-id="${escapeHtml(r.id)}" class="${rowClass}">` + COLS.map(([k, _, type, mode]) => {
       let v = r[k];
       if (v == null || v === "") return `<td></td>`;
       let cls = type === "num" ? "num" : "";
@@ -350,7 +350,8 @@
         display = escapeHtml(String(v));
       }
       return `<td class="${cls}">${display}</td>`;
-    }).join("") + "</tr>").join("");
+    }).join("") + "</tr>";
+    }).join("");
 
     tbody.querySelectorAll("tr[data-id]").forEach(tr => {
       tr.addEventListener("click", () => {
@@ -555,9 +556,11 @@
   function openEditDrawer(row) {
     currentEditId = row.id;
     deleteArmed = false;
-    editDeleteBtn.textContent = "Delete";
-    editDeleteBtn.className = "rounded-lg border border-red-300 bg-white px-3 py-2 text-sm text-red-700 hover:bg-red-50";
-    setEditStatus("", "info");
+    setEditStatus(
+      row.deleted_at ? `Soft-deleted on ${new Date(row.deleted_at).toLocaleString()}.` : "",
+      row.deleted_at ? "info" : "info"
+    );
+    setDeleteButton(row.deleted_at ? "restore" : "delete");
 
     document.getElementById("edit-trial-num").textContent = row.trial_num ?? "—";
     document.getElementById("edit-year").textContent = row.year ?? "—";
@@ -572,6 +575,20 @@
     drawer.classList.remove("hidden");
     backdrop.classList.remove("hidden");
     drawer.scrollTop = 0;
+  }
+
+  function setDeleteButton(mode) {
+    // mode = "delete" | "delete-armed" | "restore"
+    if (mode === "delete") {
+      editDeleteBtn.textContent = "Delete";
+      editDeleteBtn.className = "rounded-lg border border-red-300 bg-white px-3 py-2 text-sm text-red-700 hover:bg-red-50";
+    } else if (mode === "delete-armed") {
+      editDeleteBtn.textContent = "Confirm delete?";
+      editDeleteBtn.className = "rounded-lg border border-red-600 bg-red-600 text-white px-3 py-2 text-sm";
+    } else if (mode === "restore") {
+      editDeleteBtn.textContent = "Restore";
+      editDeleteBtn.className = "rounded-lg border border-emerald-600 bg-white px-3 py-2 text-sm text-emerald-700 hover:bg-emerald-50";
+    }
   }
 
   function closeDrawer() {
@@ -643,16 +660,27 @@
 
   editDeleteBtn.addEventListener("click", async () => {
     if (!currentEditId) return;
+    const row = allRows.find(x => x.id === currentEditId);
+    const isDeleted = !!(row && row.deleted_at);
+
+    // Restore: one-step, no confirmation.
+    if (isDeleted) {
+      editDeleteBtn.disabled = true;
+      const { error } = await supabase
+        .from("trials").update({ deleted_at: null }).eq("id", currentEditId);
+      editDeleteBtn.disabled = false;
+      if (error) { setEditStatus("Error: " + error.message, "err"); return; }
+      await loadData();
+      closeDrawer();
+      return;
+    }
+
+    // Delete: two-step.
     if (!deleteArmed) {
       deleteArmed = true;
-      editDeleteBtn.textContent = "Confirm delete?";
-      editDeleteBtn.className = "rounded-lg border border-red-600 bg-red-600 text-white px-3 py-2 text-sm";
+      setDeleteButton("delete-armed");
       setTimeout(() => {
-        if (deleteArmed) {
-          deleteArmed = false;
-          editDeleteBtn.textContent = "Delete";
-          editDeleteBtn.className = "rounded-lg border border-red-300 bg-white px-3 py-2 text-sm text-red-700 hover:bg-red-50";
-        }
+        if (deleteArmed) { deleteArmed = false; setDeleteButton("delete"); }
       }, 4000);
       return;
     }
@@ -665,6 +693,13 @@
     if (error) { setEditStatus("Error: " + error.message, "err"); return; }
     await loadData();
     closeDrawer();
+  });
+
+  // ---------- SHOW DELETED TOGGLE ----------
+  const showDeletedToggle = document.getElementById("f-show-deleted");
+  showDeletedToggle.addEventListener("change", async () => {
+    showDeleted = showDeletedToggle.checked;
+    await loadData();
   });
 
   init();
