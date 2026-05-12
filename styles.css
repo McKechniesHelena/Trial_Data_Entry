@@ -1,0 +1,42 @@
+.lbl {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgb(68 64 60);
+  margin-bottom: 0.25rem;
+}
+
+.inp {
+  width: 100%;
+  border: 1px solid rgb(214 211 209);
+  border-radius: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  background: white;
+  font-size: 1rem;
+  color: rgb(28 25 23);
+}
+
+.inp:focus {
+  outline: 2px solid rgb(5 150 105);
+  outline-offset: -1px;
+  border-color: rgb(5 150 105);
+}
+
+.inp.calc {
+  background: rgb(245 245 244);
+  color: rgb(68 64 60);
+  font-variant-numeric: tabular-nums;
+}
+
+.inp[readonly] {
+  cursor: not-allowed;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}

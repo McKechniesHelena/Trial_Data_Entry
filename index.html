@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Side-by-Side Trial Entry</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="bg-stone-50 text-stone-900">
+  <div class="mx-auto max-w-2xl p-4 pb-32">
+    <header class="mb-6">
+      <h1 class="text-2xl font-bold">Side-by-Side Trial Entry</h1>
+      <p class="text-sm text-stone-600">Fill in what you have. Calculated fields update automatically.</p>
+    </header>
+
+    <form id="trial-form" class="space-y-6">
+
+      <!-- Section: Basic Info -->
+      <fieldset class="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+        <legend class="px-2 text-sm font-semibold text-stone-700">Basic Info</legend>
+
+        <div class="grid grid-cols-2 gap-3">
+          <label class="block">
+            <span class="lbl">Year</span>
+            <input name="year" type="number" inputmode="numeric" required class="inp" />
+          </label>
+          <label class="block">
+            <span class="lbl">Size</span>
+            <select name="size" class="inp">
+              <option value="">—</option>
+              <option>Small</option><option>Large</option>
+            </select>
+          </label>
+
+          <label class="block col-span-2">
+            <span class="lbl">Sales Rep</span>
+            <input name="sales_rep" type="text" required class="inp" autocomplete="name" />
+          </label>
+
+          <label class="block col-span-2">
+            <span class="lbl">Zip Code</span>
+            <input name="zip_code" type="text" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" required class="inp" placeholder="e.g. 55104" />
+            <span id="zip-resolved" class="mt-1 block text-xs text-stone-500">Enter a 5-digit US zip to look up location.</span>
+          </label>
+
+          <label class="block col-span-2">
+            <span class="lbl">Replicated?</span>
+            <select name="rep" class="inp">
+              <option>No</option><option>Yes</option>
+            </select>
+          </label>
+        </div>
+
+        <p class="mt-3 text-xs text-stone-500">
+          Trial # and Key ID will be assigned automatically on submit.
+        </p>
+      </fieldset>
+
+      <!-- Section: Trial Setup -->
+      <fieldset class="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+        <legend class="px-2 text-sm font-semibold text-stone-700">Trial Setup</legend>
+
+        <div class="grid grid-cols-2 gap-3">
+          <label class="block">
+            <span class="lbl">Crop</span>
+            <select name="crop" required class="inp">
+              <option value="">—</option>
+              <option>Corn</option><option>SB</option><option>Wheat</option><option>Other</option>
+            </select>
+          </label>
+
+          <label class="block">
+            <span class="lbl">Treatment Type</span>
+            <select name="treatment_type" class="inp">
+              <option value="">—</option>
+              <option>Seed Treatment</option>
+              <option>Starter</option>
+              <option>Early Veg Foliar</option>
+              <option>Late Veg Foliar</option>
+              <option>Repro</option>
+              <option>Sidedress</option>
+              <option>Fertility</option>
+              <option>Agronomy</option>
+              <option>Broadcast</option>
+              <option>Helena Acre</option>
+              <option>Other - See Notes</option>
+            </select>
+          </label>
+
+          <label class="block col-span-2">
+            <span class="lbl">Growth Stage Applied</span>
+            <input name="growth_stage_applied" type="text" list="growth-stages" class="inp" />
+            <datalist id="growth-stages">
+              <option value="Seed Treatment"></option>
+              <option value="In Furrow"></option>
+              <option value="V4"></option><option value="V6"></option><option value="V8"></option>
+              <option value="Tassel"></option><option value="VT"></option>
+              <option value="R2"></option><option value="R3"></option>
+              <option value="Broadcast"></option><option value="Manure Treatment"></option>
+            </datalist>
+          </label>
+
+          <label class="block col-span-2">
+            <span class="lbl">Check Treatment (what was the control?)</span>
+            <input name="check_trt" type="text" list="check-trts" class="inp" />
+            <datalist id="check-trts">
+              <option value="Untreated"></option>
+              <option value="1 Fungicide"></option>
+              <option value="12 gal 28% Y drop"></option>
+              <option value="6-24-6 @5 Gals"></option>
+              <option value="Nexta Shield"></option>
+              <option value="Tune Up"></option>
+            </datalist>
+          </label>
+
+          <label class="block col-span-2">
+            <span class="lbl">Treatment w/ Rate</span>
+            <input name="treatment_with_rate" type="text" class="inp" placeholder="e.g. Avaris 2XS @ 4 oz + Coron @ 1 gal" />
+          </label>
+        </div>
+      </fieldset>
+
+      <!-- Section: Yield Results -->
+      <fieldset class="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+        <legend class="px-2 text-sm font-semibold text-stone-700">Yield Results</legend>
+
+        <div class="grid grid-cols-2 gap-3">
+          <label class="block">
+            <span class="lbl">Check Yield</span>
+            <input name="check_yield" type="number" step="any" inputmode="decimal" class="inp" />
+          </label>
+          <label class="block">
+            <span class="lbl">TRT Yield</span>
+            <input name="trt_yield" type="number" step="any" inputmode="decimal" class="inp" />
+          </label>
+
+          <label class="block">
+            <span class="lbl">TRT Increase</span>
+            <input name="trt_increase" type="text" readonly class="inp calc" />
+          </label>
+          <label class="block">
+            <span class="lbl">% Increase</span>
+            <input name="pct_increase" type="text" readonly class="inp calc" />
+          </label>
+        </div>
+      </fieldset>
+
+      <!-- Section: Economics -->
+      <fieldset class="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+        <legend class="px-2 text-sm font-semibold text-stone-700">Economics ($/acre)</legend>
+
+        <div class="grid grid-cols-2 gap-3">
+          <label class="block">
+            <span class="lbl">Product Cost</span>
+            <input name="product_cost" type="number" step="any" inputmode="decimal" class="inp" />
+          </label>
+          <label class="block">
+            <span class="lbl">Application Cost</span>
+            <input name="application_cost" type="number" step="any" inputmode="decimal" class="inp" />
+          </label>
+
+          <label class="block">
+            <span class="lbl">*TRT Cost</span>
+            <input name="trt_cost" type="text" readonly class="inp calc" />
+          </label>
+          <label class="block">
+            <span class="lbl">$/A Increase</span>
+            <input name="dollar_per_acre_increase" type="text" readonly class="inp calc" />
+          </label>
+
+          <label class="block">
+            <span class="lbl">Net $/Acre</span>
+            <input name="net_per_acre" type="text" readonly class="inp calc" />
+          </label>
+          <label class="block">
+            <span class="lbl">ROI</span>
+            <input name="roi" type="text" readonly class="inp calc" />
+          </label>
+        </div>
+      </fieldset>
+
+      <!-- Section: Notes -->
+      <fieldset class="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+        <legend class="px-2 text-sm font-semibold text-stone-700">Notes</legend>
+        <label class="block">
+          <span class="lbl">Customer name &amp; misc info</span>
+          <textarea name="customer_info" rows="3" class="inp"></textarea>
+        </label>
+      </fieldset>
+
+      <div id="submit-status" class="text-sm"></div>
+
+      <div class="fixed inset-x-0 bottom-0 z-10 bg-white/95 backdrop-blur border-t border-stone-200 p-3">
+        <div class="mx-auto max-w-2xl flex gap-2">
+          <button type="reset" class="flex-1 rounded-lg border border-stone-300 bg-white px-4 py-3 font-semibold text-stone-700">Clear</button>
+          <button type="submit" id="submit-btn" class="flex-[2] rounded-lg bg-emerald-600 px-4 py-3 font-semibold text-white shadow-sm active:bg-emerald-700">Submit Trial</button>
+        </div>
+      </div>
+    </form>
+
+    <p class="mt-8 text-center text-xs text-stone-500">
+      <a href="dashboard.html" class="underline">Dashboard</a> (login required)
+    </p>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

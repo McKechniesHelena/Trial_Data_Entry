@@ -1,0 +1,23 @@
+# Original source data — keep local, never push.
+*.xlsx
+*.xls
+
+# CSV exports — already imported, no need on public web.
+existing_trials.csv
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local dev
+node_modules/
+.env
+.env.local
+
+# Secrets — never commit
+*Password*
+*password*
+*secret*
+*Secret*

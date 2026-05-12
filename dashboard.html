@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Trials Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="bg-stone-50 text-stone-900">
+
+  <!-- LOGIN GATE -->
+  <section id="login-view" class="min-h-screen flex items-center justify-center p-4">
+    <form id="login-form" class="w-full max-w-sm rounded-xl border border-stone-200 bg-white p-6 shadow-sm space-y-4">
+      <h1 class="text-xl font-bold">Dashboard Login</h1>
+      <p class="text-sm text-stone-600">Sign in to view trial data.</p>
+
+      <label class="block">
+        <span class="lbl">Email</span>
+        <input id="login-email" type="email" autocomplete="username" required class="inp" />
+      </label>
+      <label class="block">
+        <span class="lbl">Password</span>
+        <input id="login-password" type="password" autocomplete="current-password" required class="inp" />
+      </label>
+
+      <div id="login-error" class="text-sm text-red-600"></div>
+
+      <button type="submit" id="login-btn" class="w-full rounded-lg bg-emerald-600 px-4 py-3 font-semibold text-white">Sign in</button>
+      <p class="text-center text-xs text-stone-500"><a href="index.html" class="underline">Back to entry form</a></p>
+    </form>
+  </section>
+
+  <!-- DASHBOARD -->
+  <section id="dashboard-view" class="hidden">
+    <header class="border-b border-stone-200 bg-white">
+      <div class="mx-auto max-w-7xl flex items-center justify-between px-4 py-3">
+        <div>
+          <h1 class="text-xl font-bold">Side-by-Side Trials</h1>
+          <p id="user-email" class="text-xs text-stone-500"></p>
+        </div>
+        <div class="flex gap-2">
+          <a href="index.html" class="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm">New Entry</a>
+          <button id="export-csv" class="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm">Export CSV</button>
+          <button id="logout-btn" class="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="mx-auto max-w-7xl p-4 space-y-4">
+
+      <!-- Filters -->
+      <div class="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+        <div class="grid grid-cols-2 md:grid-cols-6 gap-3">
+          <label class="block"><span class="lbl">Year</span>
+            <select id="f-year" class="inp"><option value="">All</option></select></label>
+          <label class="block"><span class="lbl">Crop</span>
+            <select id="f-crop" class="inp"><option value="">All</option></select></label>
+          <label class="block"><span class="lbl">State</span>
+            <select id="f-state" class="inp"><option value="">All</option></select></label>
+          <label class="block"><span class="lbl">Treatment Type</span>
+            <select id="f-treatment-type" class="inp"><option value="">All</option></select></label>
+          <label class="block"><span class="lbl">Sales Rep</span>
+            <select id="f-sales-rep" class="inp"><option value="">All</option></select></label>
+          <label class="block"><span class="lbl">Search</span>
+            <input id="f-search" type="text" class="inp" placeholder="treatment, notes…" /></label>
+        </div>
+
+        <!-- Exclusive match toggle (above products) -->
+        <div class="mt-3 rounded-lg border border-stone-200 bg-stone-50 p-3 flex items-start gap-3">
+          <label class="inline-flex items-center cursor-pointer shrink-0 pt-0.5">
+            <input id="f-products-exclusive" type="checkbox" class="h-5 w-5 rounded border-stone-400 text-emerald-600" />
+            <span class="ml-2 text-sm font-semibold text-stone-800">Exclusive match</span>
+          </label>
+          <p class="text-xs text-stone-600 leading-snug">
+            <span class="font-semibold">Off</span> — show trials whose treatment <em>includes</em> the selected products (may also include other products).
+            <br />
+            <span class="font-semibold">On</span> — show trials whose treatment is <em>exactly</em> the selected products and nothing else.
+          </p>
+        </div>
+
+        <!-- Cost override (visible only when Exclusive + products selected) -->
+        <div id="cost-override-wrap" class="hidden mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+          <span class="text-xs font-semibold uppercase tracking-wide text-emerald-800 self-center">Cost override</span>
+          <label class="block"><span class="lbl">TRT Cost ($/acre)</span>
+            <input id="cost-override" type="number" step="0.01" inputmode="decimal" class="inp w-32" placeholder="e.g. 18.50" /></label>
+          <button id="cost-override-clear" type="button" class="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm">Clear</button>
+          <span class="text-xs text-stone-600 self-center">Overrides stored TRT Cost for the selected combo. Net $/A and ROI recalc.</span>
+        </div>
+
+        <!-- Treatment-must-include multi-select -->
+        <div class="mt-3 relative" id="f-products-wrap">
+          <span class="lbl">Treatment must include</span>
+          <button type="button" id="f-products-btn"
+                  class="inp text-left flex items-center justify-between gap-2">
+            <span id="f-products-summary" class="truncate text-stone-500">Any treatment</span>
+            <span class="text-stone-400">▾</span>
+          </button>
+          <div id="f-products-panel"
+               class="hidden absolute z-20 mt-1 w-full max-w-md rounded-lg border border-stone-200 bg-white shadow-lg p-3">
+            <div class="flex items-center gap-2 mb-2">
+              <input id="f-products-search" type="text" placeholder="Filter list…"
+                     class="inp !py-1.5 text-sm flex-1" />
+              <button type="button" id="f-products-clear" class="text-xs underline text-stone-500 shrink-0">Clear</button>
+            </div>
+            <p class="text-xs text-stone-500 mb-1">
+              <span id="f-products-count">0</span> selected
+            </p>
+            <div id="f-products-list" class="max-h-64 overflow-y-auto border-t border-stone-100 pt-2 space-y-1"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Crop prices ($/bu) — recompute economics on the fly -->
+      <div class="rounded-xl border border-stone-200 bg-white p-3 shadow-sm flex flex-wrap items-end gap-3">
+        <div class="text-xs font-semibold uppercase tracking-wide text-stone-600 self-center">Crop prices ($/bu)</div>
+        <label class="block"><span class="lbl">Corn</span>
+          <input id="p-corn" type="number" step="0.01" inputmode="decimal" class="inp w-24" /></label>
+        <label class="block"><span class="lbl">Soybeans</span>
+          <input id="p-sb" type="number" step="0.01" inputmode="decimal" class="inp w-24" /></label>
+        <label class="block"><span class="lbl">Wheat</span>
+          <input id="p-wheat" type="number" step="0.01" inputmode="decimal" class="inp w-24" /></label>
+        <label class="block"><span class="lbl">Other</span>
+          <input id="p-other" type="number" step="0.01" inputmode="decimal" class="inp w-24" /></label>
+        <button id="p-reset" type="button" class="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm">Reset</button>
+        <span class="text-xs text-stone-500 ml-auto self-center">KPIs/table recalc; stored data unchanged.</span>
+      </div>
+
+      <!-- KPIs -->
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div class="kpi"><div class="kpi-label">Trials</div><div id="kpi-count" class="kpi-value">—</div></div>
+        <div class="kpi"><div class="kpi-label">Avg Yield Δ</div><div id="kpi-trt-inc" class="kpi-value">—</div></div>
+        <div class="kpi"><div class="kpi-label">Economic Win Rate</div><div id="kpi-econ-winrate" class="kpi-value">—</div></div>
+        <div class="kpi"><div class="kpi-label">Avg Net $/Acre</div><div id="kpi-net" class="kpi-value">—</div></div>
+        <div class="kpi"><div class="kpi-label">Win Rate</div><div id="kpi-winrate" class="kpi-value">—</div></div>
+      </div>
+
+      <!-- Charts -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+          <h3 class="font-semibold text-sm mb-2">Avg Yield Increase by Crop</h3>
+          <canvas id="chart-crop" height="180"></canvas>
+        </div>
+        <div class="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+          <h3 class="font-semibold text-sm mb-2">Avg Yield Increase by Treatment Type</h3>
+          <canvas id="chart-trt" height="180"></canvas>
+        </div>
+        <div class="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+          <h3 class="font-semibold text-sm mb-2">Trials by State</h3>
+          <canvas id="chart-state" height="180"></canvas>
+        </div>
+        <div class="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+          <h3 class="font-semibold text-sm mb-2">Yield Change Distribution (bu/ac)</h3>
+          <canvas id="chart-yield" height="180"></canvas>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="rounded-xl border border-stone-200 bg-white shadow-sm overflow-hidden">
+        <div class="flex items-center justify-between px-4 py-2 border-b border-stone-200 bg-stone-50">
+          <h3 class="font-semibold text-sm">Trials <span id="row-count" class="text-stone-500 font-normal"></span></h3>
+        </div>
+        <div class="overflow-x-auto max-h-[600px]">
+          <table class="min-w-full text-xs">
+            <thead class="bg-stone-100 sticky top-0">
+              <tr id="thead-row"></tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </section>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+  <script src="config.js"></script>
+  <script src="dashboard.js"></script>
+  <style>
+    .kpi { border:1px solid rgb(231 229 228); background:white; border-radius:0.75rem; padding:0.75rem 1rem; box-shadow:0 1px 2px rgba(0,0,0,0.04); }
+    .kpi-label { font-size:0.7rem; text-transform:uppercase; letter-spacing:0.04em; color:rgb(120 113 108); font-weight:600; }
+    .kpi-value { font-size:1.5rem; font-weight:700; color:rgb(28 25 23); font-variant-numeric: tabular-nums; }
+    #tbody tr:hover { background: rgb(245 245 244); }
+    #tbody td, thead th { padding: 0.5rem 0.75rem; border-bottom: 1px solid rgb(231 229 228); white-space: nowrap; }
+    thead th { text-align: left; font-weight: 600; color: rgb(68 64 60); cursor: pointer; user-select: none; }
+    thead th:hover { background: rgb(231 229 228); }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .pos { color: rgb(5 150 105); }
+    .neg { color: rgb(220 38 38); }
+  </style>
+</body>
+</html>
