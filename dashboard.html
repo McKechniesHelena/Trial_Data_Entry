@@ -173,6 +173,119 @@
     </main>
   </section>
 
+  <!-- EDIT DRAWER -->
+  <div id="edit-backdrop" class="hidden fixed inset-0 bg-black/40 z-30"></div>
+  <aside id="edit-drawer" class="hidden fixed top-0 right-0 h-full w-full max-w-2xl bg-white shadow-2xl z-40 flex flex-col">
+    <header class="flex items-center justify-between p-4 border-b border-stone-200">
+      <div>
+        <h2 class="text-lg font-bold">Edit Trial</h2>
+        <p class="text-xs text-stone-500">
+          Trial #<span id="edit-trial-num">—</span>
+          · Year <span id="edit-year">—</span>
+          · Key ID <span id="edit-key-id">—</span>
+        </p>
+      </div>
+      <button id="edit-close" type="button" class="text-stone-500 hover:text-stone-900 text-xl leading-none px-2">✕</button>
+    </header>
+
+    <form id="edit-form" class="flex-1 overflow-y-auto p-4 space-y-4">
+      <!-- Basic -->
+      <fieldset class="rounded-xl border border-stone-200 p-3">
+        <legend class="px-2 text-xs font-semibold text-stone-700">Basic</legend>
+        <div class="grid grid-cols-2 gap-3">
+          <label class="block"><span class="lbl">Sales Rep</span>
+            <input name="sales_rep" type="text" class="inp" /></label>
+          <label class="block"><span class="lbl">Size</span>
+            <select name="size" class="inp"><option value="">—</option><option>Small</option><option>Large</option></select></label>
+          <label class="block"><span class="lbl">Zip</span>
+            <input name="zip_code" type="text" class="inp" /></label>
+          <label class="block"><span class="lbl">State</span>
+            <input name="state" type="text" class="inp" /></label>
+          <label class="block col-span-2"><span class="lbl">Location</span>
+            <input name="location" type="text" class="inp" /></label>
+          <label class="block"><span class="lbl">Latitude</span>
+            <input name="latitude" type="number" step="any" class="inp" /></label>
+          <label class="block"><span class="lbl">Longitude</span>
+            <input name="longitude" type="number" step="any" class="inp" /></label>
+          <label class="block"><span class="lbl">Replicated?</span>
+            <select name="rep" class="inp"><option value="">—</option><option>No</option><option>Yes</option></select></label>
+          <label class="block"><span class="lbl">Spatial Data</span>
+            <select name="spatial_data" class="inp"><option value="">—</option><option>Yes</option><option>No</option></select></label>
+        </div>
+      </fieldset>
+
+      <!-- Trial Setup -->
+      <fieldset class="rounded-xl border border-stone-200 p-3">
+        <legend class="px-2 text-xs font-semibold text-stone-700">Trial Setup</legend>
+        <div class="grid grid-cols-2 gap-3">
+          <label class="block"><span class="lbl">Crop</span>
+            <select name="crop" class="inp"><option value="">—</option><option>Corn</option><option>SB</option><option>Wheat</option><option>Other</option></select></label>
+          <label class="block"><span class="lbl">Treatment Type</span>
+            <select name="treatment_type" class="inp">
+              <option value="">—</option>
+              <option>Seed Treatment</option><option>Starter</option>
+              <option>Early Veg Foliar</option><option>Late Veg Foliar</option>
+              <option>Repro</option><option>Sidedress</option><option>Fertility</option>
+              <option>Agronomy</option><option>Broadcast</option><option>Helena Acre</option>
+              <option>Other - See Notes</option>
+            </select></label>
+          <label class="block col-span-2"><span class="lbl">Growth Stage Applied</span>
+            <input name="growth_stage_applied" type="text" class="inp" /></label>
+          <label class="block col-span-2"><span class="lbl">Check Treatment</span>
+            <input name="check_trt" type="text" class="inp" /></label>
+          <label class="block col-span-2"><span class="lbl">Treatment w/ Rate</span>
+            <input name="treatment_with_rate" type="text" class="inp" /></label>
+          <label class="block col-span-2"><span class="lbl">Product Names</span>
+            <input name="product_names" type="text" class="inp" /></label>
+        </div>
+      </fieldset>
+
+      <!-- Yield -->
+      <fieldset class="rounded-xl border border-stone-200 p-3">
+        <legend class="px-2 text-xs font-semibold text-stone-700">Yield</legend>
+        <div class="grid grid-cols-2 gap-3">
+          <label class="block"><span class="lbl">Check Yield</span>
+            <input name="check_yield" type="number" step="any" class="inp" /></label>
+          <label class="block"><span class="lbl">TRT Yield</span>
+            <input name="trt_yield" type="number" step="any" class="inp" /></label>
+          <label class="block"><span class="lbl">Std. Dev.</span>
+            <input name="std_dev" type="number" step="any" class="inp" /></label>
+        </div>
+      </fieldset>
+
+      <!-- Economics -->
+      <fieldset class="rounded-xl border border-stone-200 p-3">
+        <legend class="px-2 text-xs font-semibold text-stone-700">Economics</legend>
+        <div class="grid grid-cols-2 gap-3">
+          <label class="block"><span class="lbl">Product Cost</span>
+            <input name="product_cost" type="number" step="any" class="inp" /></label>
+          <label class="block"><span class="lbl">Application Cost</span>
+            <input name="application_cost" type="number" step="any" class="inp" /></label>
+        </div>
+        <p class="mt-2 text-xs text-stone-500">TRT Cost, $/A Δ, Net $/A, and ROI recompute automatically on Save.</p>
+      </fieldset>
+
+      <!-- Notes -->
+      <fieldset class="rounded-xl border border-stone-200 p-3">
+        <legend class="px-2 text-xs font-semibold text-stone-700">Notes</legend>
+        <label class="block"><span class="lbl">Customer name &amp; misc info</span>
+          <textarea name="customer_info" rows="3" class="inp"></textarea></label>
+      </fieldset>
+
+      <p id="edit-status" class="text-sm"></p>
+    </form>
+
+    <footer class="flex items-center justify-between p-4 border-t border-stone-200 bg-stone-50">
+      <button id="edit-delete" type="button"
+              class="rounded-lg border border-red-300 bg-white px-3 py-2 text-sm text-red-700 hover:bg-red-50">Delete</button>
+      <div class="flex gap-2">
+        <button id="edit-cancel" type="button" class="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm">Cancel</button>
+        <button id="edit-save" type="submit" form="edit-form"
+                class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Save</button>
+      </div>
+    </footer>
+  </aside>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>

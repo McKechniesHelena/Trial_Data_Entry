@@ -111,6 +111,7 @@
     const { data, error } = await supabase
       .from("trials")
       .select("*")
+      .is("deleted_at", null)
       .order("key_id", { ascending: false })
       .limit(10000);
     if (error) { alert("Error loading data: " + error.message); return; }
@@ -336,7 +337,7 @@
     });
 
     const tbody = document.getElementById("tbody");
-    tbody.innerHTML = sorted.map(r => "<tr>" + COLS.map(([k, _, type, mode]) => {
+    tbody.innerHTML = sorted.map(r => `<tr data-id="${escapeHtml(r.id)}" class="cursor-pointer">` + COLS.map(([k, _, type, mode]) => {
       let v = r[k];
       if (v == null || v === "") return `<td></td>`;
       let cls = type === "num" ? "num" : "";
@@ -350,6 +351,13 @@
       }
       return `<td class="${cls}">${display}</td>`;
     }).join("") + "</tr>").join("");
+
+    tbody.querySelectorAll("tr[data-id]").forEach(tr => {
+      tr.addEventListener("click", () => {
+        const row = allRows.find(x => x.id === tr.dataset.id);
+        if (row) openEditDrawer(row);
+      });
+    });
 
     document.getElementById("row-count").textContent = `(${sorted.length})`;
   }
@@ -517,6 +525,147 @@
     pSummary.textContent = productExclusive ? `Only: ${base}` : base;
     pSummary.className = "truncate text-stone-900 font-medium";
   }
+
+  // ---------- EDIT DRAWER ----------
+  const drawer = document.getElementById("edit-drawer");
+  const backdrop = document.getElementById("edit-backdrop");
+  const editForm = document.getElementById("edit-form");
+  const editStatus = document.getElementById("edit-status");
+  const editDeleteBtn = document.getElementById("edit-delete");
+  const editSaveBtn = document.getElementById("edit-save");
+
+  let currentEditId = null;
+  let deleteArmed = false;
+
+  // Fields the drawer can edit. Locked fields (id, key_id, trial_num, year, created_at, deleted_at) are NOT here.
+  const EDITABLE = [
+    "sales_rep","size","zip_code","state","location","latitude","longitude",
+    "rep","spatial_data",
+    "crop","treatment_type","growth_stage_applied","check_trt",
+    "treatment_with_rate","product_names",
+    "check_yield","trt_yield","std_dev",
+    "product_cost","application_cost",
+    "customer_info",
+  ];
+  const NUMERIC = new Set([
+    "latitude","longitude","check_yield","trt_yield","std_dev",
+    "product_cost","application_cost",
+  ]);
+
+  function openEditDrawer(row) {
+    currentEditId = row.id;
+    deleteArmed = false;
+    editDeleteBtn.textContent = "Delete";
+    editDeleteBtn.className = "rounded-lg border border-red-300 bg-white px-3 py-2 text-sm text-red-700 hover:bg-red-50";
+    setEditStatus("", "info");
+
+    document.getElementById("edit-trial-num").textContent = row.trial_num ?? "—";
+    document.getElementById("edit-year").textContent = row.year ?? "—";
+    document.getElementById("edit-key-id").textContent = row.key_id ?? "—";
+
+    for (const name of EDITABLE) {
+      const el = editForm.elements[name];
+      if (!el) continue;
+      el.value = row[name] == null ? "" : row[name];
+    }
+
+    drawer.classList.remove("hidden");
+    backdrop.classList.remove("hidden");
+    drawer.scrollTop = 0;
+  }
+
+  function closeDrawer() {
+    drawer.classList.add("hidden");
+    backdrop.classList.add("hidden");
+    currentEditId = null;
+  }
+
+  function setEditStatus(msg, kind) {
+    editStatus.textContent = msg;
+    editStatus.className = "text-sm " + ({
+      ok: "text-emerald-700", err: "text-red-600", info: "text-stone-600",
+    }[kind] ?? "");
+  }
+
+  document.getElementById("edit-close").addEventListener("click", closeDrawer);
+  document.getElementById("edit-cancel").addEventListener("click", closeDrawer);
+  backdrop.addEventListener("click", closeDrawer);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !drawer.classList.contains("hidden")) closeDrawer();
+  });
+
+  // Recompute economics using DEFAULT crop prices (not the dashboard override),
+  // so stored values stay consistent. The dashboard re-applies its overrides on render.
+  function recomputeEconomics(row) {
+    const price = cfg.CROP_PRICE[row.crop] ?? 0;
+    const ck = row.check_yield, tr = row.trt_yield;
+    row.trt_increase = (ck != null && tr != null) ? +(tr - ck).toFixed(2) : null;
+    row.pct_increase = (ck != null && tr != null && ck !== 0)
+      ? +((tr - ck) / ck).toFixed(6) : null;
+    const pc = row.product_cost, ac = row.application_cost;
+    row.trt_cost = (pc != null || ac != null)
+      ? +(((pc ?? 0) + (ac ?? 0))).toFixed(2) : null;
+    row.dollar_per_acre_increase = (row.trt_increase != null && price)
+      ? +(row.trt_increase * price).toFixed(2) : null;
+    row.net_per_acre = (row.dollar_per_acre_increase != null && row.trt_cost != null)
+      ? +(row.dollar_per_acre_increase - row.trt_cost).toFixed(2) : null;
+    row.roi = (row.net_per_acre != null && row.trt_cost != null && row.trt_cost > 0)
+      ? +(row.net_per_acre / row.trt_cost).toFixed(4) : null;
+    return row;
+  }
+
+  editForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!currentEditId) return;
+    editSaveBtn.disabled = true; editSaveBtn.textContent = "Saving…";
+    setEditStatus("", "info");
+
+    const update = {};
+    for (const name of EDITABLE) {
+      const el = editForm.elements[name];
+      if (!el) continue;
+      const raw = el.value.trim();
+      if (raw === "") { update[name] = null; continue; }
+      update[name] = NUMERIC.has(name) ? parseFloat(raw) : raw;
+    }
+    // Recompute derived $-fields from new raw inputs.
+    recomputeEconomics(update);
+
+    const { error } = await supabase.from("trials").update(update).eq("id", currentEditId);
+
+    editSaveBtn.disabled = false; editSaveBtn.textContent = "Save";
+    if (error) { setEditStatus("Error: " + error.message, "err"); return; }
+
+    setEditStatus("Saved.", "ok");
+    await loadData();
+    setTimeout(closeDrawer, 400);
+  });
+
+  editDeleteBtn.addEventListener("click", async () => {
+    if (!currentEditId) return;
+    if (!deleteArmed) {
+      deleteArmed = true;
+      editDeleteBtn.textContent = "Confirm delete?";
+      editDeleteBtn.className = "rounded-lg border border-red-600 bg-red-600 text-white px-3 py-2 text-sm";
+      setTimeout(() => {
+        if (deleteArmed) {
+          deleteArmed = false;
+          editDeleteBtn.textContent = "Delete";
+          editDeleteBtn.className = "rounded-lg border border-red-300 bg-white px-3 py-2 text-sm text-red-700 hover:bg-red-50";
+        }
+      }, 4000);
+      return;
+    }
+    editDeleteBtn.disabled = true;
+    const { error } = await supabase
+      .from("trials")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", currentEditId);
+    editDeleteBtn.disabled = false;
+    if (error) { setEditStatus("Error: " + error.message, "err"); return; }
+    await loadData();
+    closeDrawer();
+  });
 
   init();
 })();
