@@ -19,7 +19,7 @@
       <button type="button" class="remove-product absolute top-2 right-2 text-stone-400 hover:text-red-600 text-lg leading-none px-1" aria-label="Remove product">×</button>
       <label class="block mb-2">
         <span class="lbl">Product</span>
-        <input type="text" class="inp product-name" placeholder="e.g. Avaris 2XS" />
+        <input type="text" class="inp product-name" list="product-suggest" placeholder="e.g. Avaris 2XS" />
       </label>
       <div class="grid grid-cols-2 gap-2">
         <label class="block">
@@ -75,6 +75,18 @@
     createProductRow();
   });
   createProductRow(); // start with one row
+
+  // Populate the shared product-name datalist from a Postgres RPC.
+  // The function returns only distinct product strings — no trial data exposed.
+  async function loadProductSuggestions() {
+    const { data, error } = await supabase.rpc("distinct_products");
+    if (error) return; // silent fallback: free-text only
+    const dl = document.getElementById("product-suggest");
+    dl.innerHTML = (data ?? [])
+      .map(d => `<option value="${String(d.product ?? "").replace(/"/g, "&quot;")}"></option>`)
+      .join("");
+  }
+  loadProductSuggestions();
 
   // Prefill year + remembered sales rep + zip.
   form.elements.year.value = new Date().getFullYear();
