@@ -1113,5 +1113,237 @@
     await loadData();
   });
 
+  // ---------- CSV IMPORT ----------
+  const IMPORT_TEXT = new Set([
+    "sales_rep","branch","state","location","zip_code",
+    "crop","treatment_type","growth_stage_applied","check_trt",
+    "treatment_with_rate","product_names","customer_info",
+    "rep","spatial_data","size",
+    "product_1","unit_1","product_2","unit_2","product_3","unit_3",
+    "product_4","unit_4","product_5","unit_5",
+  ]);
+  const IMPORT_NUMERIC = new Set([
+    "year","trial_num","key_id",
+    "check_yield","trt_yield","trt_increase","pct_increase","std_dev",
+    "product_cost","application_cost","trt_cost",
+    "dollar_per_acre_increase","net_per_acre","roi",
+    "latitude","longitude",
+    "rate_1","rate_2","rate_3","rate_4","rate_5",
+  ]);
+  const IMPORT_SKIP = new Set(["id","created_at","deleted_at","submitted_by"]);
+
+  const importBackdrop = document.getElementById("import-backdrop");
+  const importModal = document.getElementById("import-modal");
+  const importFile = document.getElementById("import-file");
+  const importFilename = document.getElementById("import-filename");
+  const importSummary = document.getElementById("import-summary");
+  const importPreviewWrap = document.getElementById("import-preview-wrap");
+  const importThead = document.getElementById("import-thead");
+  const importTbody = document.getElementById("import-tbody");
+  const importIssues = document.getElementById("import-issues");
+  const importStatus = document.getElementById("import-status");
+  const importRunBtn = document.getElementById("import-run");
+
+  let importedRows = [];
+  let importedIssues = [];
+
+  function resetImportState() {
+    importFile.value = "";
+    importFilename.textContent = "No file selected.";
+    importSummary.classList.add("hidden");
+    importPreviewWrap.classList.add("hidden");
+    importIssues.classList.add("hidden");
+    importStatus.textContent = "";
+    importStatus.className = "text-sm";
+    importedRows = [];
+    importedIssues = [];
+    importRunBtn.disabled = true;
+  }
+  function openImport() {
+    importBackdrop.classList.remove("hidden");
+    importModal.classList.remove("hidden");
+    resetImportState();
+  }
+  function closeImport() {
+    importBackdrop.classList.add("hidden");
+    importModal.classList.add("hidden");
+  }
+
+  document.getElementById("import-csv").addEventListener("click", openImport);
+  document.getElementById("import-close").addEventListener("click", closeImport);
+  document.getElementById("import-cancel").addEventListener("click", closeImport);
+  importBackdrop.addEventListener("click", closeImport);
+
+  function parseCSV(text) {
+    const rows = [];
+    let row = [], cell = "", inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (inQuotes) {
+        if (c === '"') {
+          if (text[i + 1] === '"') { cell += '"'; i++; }
+          else inQuotes = false;
+        } else cell += c;
+      } else {
+        if (c === '"' && cell === "") inQuotes = true;
+        else if (c === ",") { row.push(cell); cell = ""; }
+        else if (c === "\r") { /* skip */ }
+        else if (c === "\n") { row.push(cell); rows.push(row); row = []; cell = ""; }
+        else cell += c;
+      }
+    }
+    if (cell !== "" || row.length > 0) { row.push(cell); rows.push(row); }
+    return rows.filter(r => r.length > 1 || (r.length === 1 && r[0] !== ""));
+  }
+  function normalizeHeader(h) {
+    return String(h).trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
+  }
+  function parseCellValue(field, raw) {
+    if (raw == null) return null;
+    const s = String(raw).trim();
+    if (s === "" || s === "—" || s.toLowerCase() === "null") return null;
+    if (IMPORT_NUMERIC.has(field)) {
+      const n = parseFloat(s);
+      return Number.isFinite(n) ? n : null;
+    }
+    return s;
+  }
+  function buildTreatmentFromSlots(row) {
+    const parts = [];
+    for (let i = 1; i <= 5; i++) {
+      const name = row[`product_${i}`];
+      const rate = row[`rate_${i}`];
+      const unit = row[`unit_${i}`];
+      if (!name) continue;
+      if (Number.isFinite(rate) && unit) parts.push(`${name} @ ${rate} ${unit}`);
+      else if (Number.isFinite(rate)) parts.push(`${name} @ ${rate}`);
+      else parts.push(name);
+    }
+    return parts.length ? parts.join(" + ") : null;
+  }
+  function recomputeImportEconomics(row) {
+    const price = cfg.CROP_PRICE[row.crop] ?? 0;
+    if (row.check_yield != null && row.trt_yield != null) {
+      row.trt_increase = +(row.trt_yield - row.check_yield).toFixed(2);
+      row.pct_increase = row.check_yield !== 0
+        ? +((row.trt_yield - row.check_yield) / row.check_yield).toFixed(6)
+        : null;
+    }
+    if (row.product_cost != null || row.application_cost != null) {
+      row.trt_cost = +(((row.product_cost ?? 0) + (row.application_cost ?? 0))).toFixed(2);
+    }
+    if (row.trt_increase != null && price) {
+      row.dollar_per_acre_increase = +(row.trt_increase * price).toFixed(2);
+    }
+    if (row.dollar_per_acre_increase != null && row.trt_cost != null) {
+      row.net_per_acre = +(row.dollar_per_acre_increase - row.trt_cost).toFixed(2);
+      row.roi = row.trt_cost > 0 ? +(row.net_per_acre / row.trt_cost).toFixed(4) : null;
+    }
+    return row;
+  }
+
+  importFile.addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) { resetImportState(); return; }
+    importFilename.textContent = `${file.name} · ${(file.size / 1024).toFixed(1)} KB`;
+    const text = await file.text();
+    const grid = parseCSV(text);
+    if (grid.length < 2) {
+      importStatus.textContent = "CSV needs at least a header row and one data row.";
+      importStatus.className = "text-sm text-red-600";
+      return;
+    }
+    const headers = grid[0].map(normalizeHeader);
+    const dataRows = grid.slice(1);
+
+    const unknownHeaders = headers.filter(h => h && !IMPORT_TEXT.has(h) && !IMPORT_NUMERIC.has(h) && !IMPORT_SKIP.has(h));
+    importedIssues = [];
+    if (unknownHeaders.length) {
+      importedIssues.push(`Ignored ${unknownHeaders.length} unknown column(s): ${unknownHeaders.join(", ")}`);
+    }
+
+    importedRows = [];
+    let skippedNoYear = 0, skippedEmpty = 0;
+    for (const raw of dataRows) {
+      const row = {};
+      for (let i = 0; i < headers.length; i++) {
+        const h = headers[i];
+        if (!h || IMPORT_SKIP.has(h)) continue;
+        if (!IMPORT_TEXT.has(h) && !IMPORT_NUMERIC.has(h)) continue;
+        const v = parseCellValue(h, raw[i]);
+        if (v != null) row[h] = v;
+      }
+      if (Object.keys(row).length === 0) { skippedEmpty++; continue; }
+      if (row.year == null) { skippedNoYear++; continue; }
+      const hasSlots = [1,2,3,4,5].some(i => row[`product_${i}`]);
+      if (hasSlots) row.treatment_with_rate = buildTreatmentFromSlots(row);
+      if (row.trial_num == null) delete row.key_id;
+      recomputeImportEconomics(row);
+      if (row.sales_rep) row.submitted_by = row.sales_rep;
+      importedRows.push(row);
+    }
+    if (skippedNoYear) importedIssues.push(`Skipped ${skippedNoYear} row(s) missing Year.`);
+    if (skippedEmpty) importedIssues.push(`Skipped ${skippedEmpty} blank row(s).`);
+
+    importSummary.classList.remove("hidden");
+    importSummary.innerHTML = `
+      <div><strong>${importedRows.length}</strong> row${importedRows.length === 1 ? "" : "s"} ready to import.</div>
+      <div class="text-xs text-stone-500">Trial # / Key ID will be auto-assigned. Derived \$-fields are recomputed from raw inputs.</div>
+    `;
+    if (importedIssues.length) {
+      importIssues.classList.remove("hidden");
+      importIssues.innerHTML = importedIssues.map(s => `<div>• ${escapeHtml(s)}</div>`).join("");
+    } else {
+      importIssues.classList.add("hidden");
+    }
+
+    if (importedRows.length) {
+      const previewCols = Array.from(new Set(importedRows.flatMap(r => Object.keys(r)))).slice(0, 12);
+      importThead.innerHTML = previewCols.map(c => `<th class="text-left font-semibold px-2 py-1 border-b border-stone-200">${escapeHtml(c)}</th>`).join("");
+      importTbody.innerHTML = importedRows.slice(0, 5).map(r =>
+        `<tr>${previewCols.map(c => `<td class="px-2 py-1 border-b border-stone-100">${r[c] == null ? "" : escapeHtml(String(r[c]).slice(0, 60))}</td>`).join("")}</tr>`
+      ).join("");
+      importPreviewWrap.classList.remove("hidden");
+      importRunBtn.disabled = false;
+    } else {
+      importPreviewWrap.classList.add("hidden");
+      importRunBtn.disabled = true;
+    }
+    importStatus.textContent = "";
+  });
+
+  importRunBtn.addEventListener("click", async () => {
+    if (!importedRows.length) return;
+    importRunBtn.disabled = true;
+    const total = importedRows.length;
+    let inserted = 0, failed = 0;
+    const chunkSize = 100;
+    for (let i = 0; i < total; i += chunkSize) {
+      const chunk = importedRows.slice(i, i + chunkSize);
+      importStatus.textContent = `Importing ${i + 1}–${Math.min(i + chunk.length, total)} of ${total}…`;
+      importStatus.className = "text-sm text-stone-600";
+      const { error } = await supabase.from("trials").insert(chunk);
+      if (error) {
+        failed += chunk.length;
+        importedIssues.push(`Chunk ${i / chunkSize + 1} failed: ${error.message}`);
+      } else {
+        inserted += chunk.length;
+      }
+    }
+    if (failed === 0) {
+      importStatus.textContent = `Imported ${inserted} of ${total} rows. Refreshing dashboard…`;
+      importStatus.className = "text-sm text-emerald-700";
+      await loadData();
+      setTimeout(closeImport, 600);
+    } else {
+      importStatus.textContent = `Imported ${inserted} of ${total} rows; ${failed} failed.`;
+      importStatus.className = "text-sm text-amber-700";
+      importIssues.classList.remove("hidden");
+      importIssues.innerHTML = importedIssues.map(s => `<div>• ${escapeHtml(s)}</div>`).join("");
+      await loadData();
+    }
+    importRunBtn.disabled = false;
+  });
+
   init();
 })();
