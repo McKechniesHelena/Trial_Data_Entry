@@ -191,6 +191,21 @@
     f.roi.value = roi != null ? `${(roi * 100).toFixed(0)}%` : "";
   }
 
+  // Yield-units hint flips when Crop = Alfalfa.
+  const yieldHint = document.getElementById("yield-units-hint");
+  function updateYieldHint() {
+    const crop = form.elements.crop.value;
+    if (crop === "Alfalfa") {
+      yieldHint.textContent = "Enter yields in tons/ac (Alfalfa).";
+      yieldHint.className = "mb-2 text-xs text-emerald-700 font-medium";
+    } else {
+      yieldHint.textContent = "Enter yields in bu/ac.";
+      yieldHint.className = "mb-2 text-xs text-stone-500";
+    }
+  }
+  form.elements.crop.addEventListener("change", updateYieldHint);
+  updateYieldHint();
+
   form.addEventListener("input", recalc);
   form.addEventListener("change", recalc);
   recalc();
