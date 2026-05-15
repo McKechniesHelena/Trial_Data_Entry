@@ -348,6 +348,9 @@
     const byBranch = groupCount(rows, "branch").sort((a,b)=>b.v-a.v);
     mk("chart-branch", "bar", byBranch.map(g=>g.k), byBranch.map(g=>g.v), "Trials");
 
+    const bySalesRep = groupCount(rows, "sales_rep").sort((a,b)=>b.v-a.v);
+    mk("chart-sales-rep", "bar", bySalesRep.map(g=>g.k), bySalesRep.map(g=>g.v), "Trials");
+
     // Histogram of trt_increase (bu/ac).
     const incs = rows.map(r => r.trt_increase).filter(v => v != null);
     const bounds = [-10, -5, -2, 0, 2, 5, 10, 20];
