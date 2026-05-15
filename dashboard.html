@@ -199,8 +199,8 @@
         <div class="grid grid-cols-2 gap-3">
           <label class="block"><span class="lbl">Sales Rep</span>
             <input name="sales_rep" type="text" class="inp" /></label>
-          <label class="block"><span class="lbl">Size</span>
-            <select name="size" class="inp"><option value="">—</option><option>Small</option><option>Large</option></select></label>
+          <label class="block"><span class="lbl">Over 10 acres?</span>
+            <select name="size_over_10" class="inp"><option value="">—</option><option>Yes</option><option>No</option></select></label>
           <label class="block"><span class="lbl">Zip</span>
             <input name="zip_code" type="text" class="inp" /></label>
           <label class="block"><span class="lbl">State</span>
@@ -237,9 +237,13 @@
             <input name="growth_stage_applied" type="text" class="inp" /></label>
           <label class="block col-span-2"><span class="lbl">Check Treatment</span>
             <input name="check_trt" type="text" class="inp" /></label>
-          <label class="block col-span-2"><span class="lbl">Treatment w/ Rate</span>
-            <input name="treatment_with_rate" type="text" class="inp" /></label>
-          <label class="block col-span-2"><span class="lbl">Product Names</span>
+          <div class="col-span-2">
+            <span class="lbl">Products applied (up to 5)</span>
+            <div id="edit-product-list" class="space-y-2 mt-1"></div>
+          </div>
+          <label class="block col-span-2"><span class="lbl">Treatment w/ Rate (auto-built; edit above)</span>
+            <input name="treatment_with_rate" type="text" class="inp bg-stone-50" readonly /></label>
+          <label class="block col-span-2"><span class="lbl">Product Names (legacy)</span>
             <input name="product_names" type="text" class="inp" /></label>
         </div>
       </fieldset>

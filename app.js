@@ -224,8 +224,31 @@
     const roi = (net_per_acre != null && trt_cost != null && trt_cost > 0)
       ? +(net_per_acre / trt_cost).toFixed(4) : null;
 
+    // Pull structured product slots (1..5) from the dynamic rows.
+    const productCols = {};
+    const productRows = [...productList.children];
+    for (let i = 1; i <= 5; i++) {
+      const rowEl = productRows[i - 1];
+      if (rowEl) {
+        const name = rowEl.querySelector(".product-name").value.trim() || null;
+        const rateRaw = rowEl.querySelector(".product-rate").value.trim();
+        const unit = rowEl.querySelector(".product-unit").value.trim() || null;
+        productCols[`product_${i}`] = name;
+        productCols[`rate_${i}`] = rateRaw ? parseFloat(rateRaw) : null;
+        productCols[`unit_${i}`] = unit;
+      } else {
+        productCols[`product_${i}`] = null;
+        productCols[`rate_${i}`] = null;
+        productCols[`unit_${i}`] = null;
+      }
+    }
+
+    const sizeOver10 = f.size_over_10.value;
+    const sizeStored = sizeOver10 === "Yes" ? "Large" : sizeOver10 === "No" ? "Small" : null;
+
     const row = {
       // trial_num + key_id are filled in by a Postgres trigger
+      ...productCols,
       rep: f.rep.value || null,
       crop: f.crop.value || null,
       check_yield: checkY,
@@ -250,7 +273,7 @@
       longitude: zipResult && !zipResult.error ? zipResult.lng : null,
       sales_rep: f.sales_rep.value || null,
       customer_info: f.customer_info.value || null,
-      size: f.size.value || null,
+      size: sizeStored,
       submitted_by: f.sales_rep.value || null,
     };
 

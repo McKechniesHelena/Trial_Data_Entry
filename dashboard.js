@@ -115,7 +115,7 @@
     const { data, error } = await q;
     if (error) { alert("Error loading data: " + error.message); return; }
     allRows = data ?? [];
-    for (const r of allRows) r._products = parseProducts(r.treatment_with_rate);
+    for (const r of allRows) r._products = rowProducts(r);
     populateFilters(allRows);
     populateProductsList();
     render();
@@ -128,6 +128,17 @@
       .map(s => s.replace(/\s*@[^+&,/]*$/, "").trim())  // strip rate suffix like "@ 4 oz"
       .map(s => s.replace(/\s+/g, " "))                 // collapse spaces
       .filter(s => s.length > 0);
+  }
+  // Prefer the structured product_1..5 columns; fall back to parsing
+  // treatment_with_rate for any row not yet backfilled.
+  function rowProducts(r) {
+    const out = [];
+    for (let i = 1; i <= 5; i++) {
+      const p = r[`product_${i}`];
+      if (p && String(p).trim()) out.push(String(p).trim());
+    }
+    if (out.length) return out;
+    return parseProducts(r.treatment_with_rate);
   }
 
   function uniqueProducts(rows) {
@@ -539,11 +550,13 @@
   let deleteArmed = false;
 
   // Fields the drawer can edit. Locked fields (id, key_id, trial_num, year, created_at, deleted_at) are NOT here.
+  // Note: size is set via the size_over_10 control (Yes/No) and translated to Large/Small.
+  // Note: treatment_with_rate is rebuilt from the 5 product slots on save.
   const EDITABLE = [
-    "sales_rep","size","zip_code","state","location","latitude","longitude",
+    "sales_rep","zip_code","state","location","latitude","longitude",
     "rep","spatial_data",
     "crop","treatment_type","growth_stage_applied","check_trt",
-    "treatment_with_rate","product_names",
+    "product_names",
     "check_yield","trt_yield","std_dev",
     "product_cost","application_cost",
     "customer_info",
@@ -552,6 +565,90 @@
     "latitude","longitude","check_yield","trt_yield","std_dev",
     "product_cost","application_cost",
   ]);
+  const UNITS = ["gal", "fl oz", "lbs", "dry oz"];
+
+  // ----- Product slots inside the drawer -----
+  const editProductList = document.getElementById("edit-product-list");
+
+  function createEditProductRow(prefill = {}) {
+    const row = document.createElement("div");
+    row.className = "rounded-lg border border-stone-200 bg-stone-50 p-2 grid grid-cols-12 gap-2";
+    row.innerHTML = `
+      <label class="block col-span-12 sm:col-span-6">
+        <span class="lbl">Product</span>
+        <input type="text" class="inp product-name" />
+      </label>
+      <label class="block col-span-6 sm:col-span-3">
+        <span class="lbl">Rate</span>
+        <input type="number" step="any" class="inp product-rate" />
+      </label>
+      <label class="block col-span-6 sm:col-span-3">
+        <span class="lbl">Unit</span>
+        <select class="inp product-unit">
+          <option value=""></option>
+          ${UNITS.map(u => `<option>${u}</option>`).join("")}
+        </select>
+      </label>`;
+    row.querySelector(".product-name").value = prefill.product ?? "";
+    row.querySelector(".product-rate").value = prefill.rate ?? "";
+    const unitSel = row.querySelector(".product-unit");
+    if (prefill.unit) {
+      // Allow values outside the standard list (legacy data).
+      if (!UNITS.includes(prefill.unit)) {
+        unitSel.insertAdjacentHTML("beforeend", `<option>${escapeHtml(prefill.unit)}</option>`);
+      }
+      unitSel.value = prefill.unit;
+    }
+    return row;
+  }
+
+  function parseTreatmentString(str) {
+    if (!str) return [];
+    return str.split(/\s*\+\s*/).map(part => {
+      const m = part.match(/^(.+?)\s*@\s*([\d.]+)\s*(.*)$/);
+      if (m) return { product: m[1].trim(), rate: parseFloat(m[2]), unit: m[3].trim() || null };
+      return { product: part.trim(), rate: null, unit: null };
+    });
+  }
+
+  function loadEditProductSlots(row) {
+    editProductList.innerHTML = "";
+    // Prefer the structured columns; fall back to parsed legacy string.
+    const slots = [];
+    for (let i = 1; i <= 5; i++) {
+      if (row[`product_${i}`]) {
+        slots.push({ product: row[`product_${i}`], rate: row[`rate_${i}`], unit: row[`unit_${i}`] });
+      }
+    }
+    const filled = slots.length > 0 ? slots : parseTreatmentString(row.treatment_with_rate).slice(0, 5);
+    // Always render exactly 5 rows so the user can fill in the rest.
+    for (let i = 0; i < 5; i++) {
+      editProductList.appendChild(createEditProductRow(filled[i] ?? {}));
+    }
+  }
+
+  function gatherEditProductSlots() {
+    const out = {};
+    const rows = [...editProductList.children];
+    const parts = [];
+    for (let i = 1; i <= 5; i++) {
+      const r = rows[i - 1];
+      const name = r?.querySelector(".product-name").value.trim() || null;
+      const rateRaw = r?.querySelector(".product-rate").value.trim() || "";
+      const unit = r?.querySelector(".product-unit").value.trim() || null;
+      const rate = rateRaw ? parseFloat(rateRaw) : null;
+      out[`product_${i}`] = name;
+      out[`rate_${i}`] = Number.isFinite(rate) ? rate : null;
+      out[`unit_${i}`] = unit;
+      if (name) {
+        if (Number.isFinite(rate) && unit) parts.push(`${name} @ ${rate} ${unit}`);
+        else if (Number.isFinite(rate)) parts.push(`${name} @ ${rate}`);
+        else parts.push(name);
+      }
+    }
+    out.treatment_with_rate = parts.join(" + ") || null;
+    return out;
+  }
 
   function openEditDrawer(row) {
     currentEditId = row.id;
@@ -571,6 +668,15 @@
       if (!el) continue;
       el.value = row[name] == null ? "" : row[name];
     }
+    // Read-only preview of the auto-built treatment string.
+    if (editForm.elements.treatment_with_rate) {
+      editForm.elements.treatment_with_rate.value = row.treatment_with_rate ?? "";
+    }
+    // Map size (Large/Small) to the Over 10 acres? Yes/No control.
+    editForm.elements.size_over_10.value =
+      row.size === "Large" ? "Yes" : row.size === "Small" ? "No" : "";
+
+    loadEditProductSlots(row);
 
     drawer.classList.remove("hidden");
     backdrop.classList.remove("hidden");
@@ -645,6 +751,11 @@
       if (raw === "") { update[name] = null; continue; }
       update[name] = NUMERIC.has(name) ? parseFloat(raw) : raw;
     }
+    // Size mapping (Yes/No -> Large/Small).
+    const sizeChoice = editForm.elements.size_over_10.value;
+    update.size = sizeChoice === "Yes" ? "Large" : sizeChoice === "No" ? "Small" : null;
+    // Pull the structured product slots and rebuild treatment_with_rate.
+    Object.assign(update, gatherEditProductSlots());
     // Recompute derived $-fields from new raw inputs.
     recomputeEconomics(update);
 
