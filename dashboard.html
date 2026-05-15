@@ -66,6 +66,8 @@
             <select id="f-treatment-type" class="inp"><option value="">All</option></select></label>
           <label class="block"><span class="lbl">Sales Rep</span>
             <select id="f-sales-rep" class="inp"><option value="">All</option></select></label>
+          <label class="block"><span class="lbl">Branch</span>
+            <select id="f-branch" class="inp"><option value="">All</option></select></label>
           <label class="block"><span class="lbl">Search</span>
             <input id="f-search" type="text" class="inp" placeholder="treatment, notes…" /></label>
         </div>
@@ -160,6 +162,10 @@
           <canvas id="chart-state" height="180"></canvas>
         </div>
         <div class="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+          <h3 class="font-semibold text-sm mb-2">Trials by Branch</h3>
+          <canvas id="chart-branch" height="180"></canvas>
+        </div>
+        <div class="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
           <h3 class="font-semibold text-sm mb-2">Yield Change Distribution (bu/ac)</h3>
           <canvas id="chart-yield" height="180"></canvas>
         </div>
@@ -227,6 +233,9 @@
         <div class="grid grid-cols-2 gap-3">
           <label class="block"><span class="lbl">Sales Rep</span>
             <input name="sales_rep" type="text" class="inp" /></label>
+          <label class="block"><span class="lbl">Branch</span>
+            <input name="branch" type="text" class="inp" list="edit-branch-suggest" />
+            <datalist id="edit-branch-suggest"></datalist></label>
           <label class="block"><span class="lbl">Over 10 acres?</span>
             <select name="size_over_10" class="inp"><option value="">—</option><option>Yes</option><option>No</option></select></label>
           <label class="block"><span class="lbl">Zip</span>

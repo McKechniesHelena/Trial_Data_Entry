@@ -57,6 +57,7 @@
     ["year", "Year", "num"],
     ["trial_num", "Trial #", "num"],
     ["sales_rep", "Sales Rep"],
+    ["branch", "Branch"],
     ["state", "State"],
     ["zip_code", "Zip"],
     ["location", "Location"],
@@ -178,6 +179,14 @@
     fill("f-state", rows.map(r => r.state));
     fill("f-treatment-type", rows.map(r => r.treatment_type));
     fill("f-sales-rep", rows.map(r => r.sales_rep));
+    fill("f-branch", rows.map(r => r.branch));
+
+    // Branch suggestions for the edit drawer datalist
+    const dl = document.getElementById("edit-branch-suggest");
+    if (dl) {
+      const branches = [...new Set(rows.map(r => r.branch).filter(Boolean))].sort();
+      dl.innerHTML = branches.map(b => `<option value="${escapeHtml(b)}"></option>`).join("");
+    }
   }
 
   function getFiltered() {
@@ -186,6 +195,7 @@
     const fs = document.getElementById("f-state").value;
     const ft = document.getElementById("f-treatment-type").value;
     const fr = document.getElementById("f-sales-rep").value;
+    const fb = document.getElementById("f-branch").value;
     const q = document.getElementById("f-search").value.trim().toLowerCase();
     const sel = [...selectedProducts]; // lowercased canonical keys
 
@@ -195,6 +205,7 @@
       if (fs && r.state !== fs) return false;
       if (ft && r.treatment_type !== ft) return false;
       if (fr && r.sales_rep !== fr) return false;
+      if (fb && r.branch !== fb) return false;
       if (sel.length) {
         const slots = r._slots ?? [];
         const slotByProduct = new Map(); // lc product -> slot
@@ -333,6 +344,9 @@
 
     const byState = groupCount(rows, "state").sort((a,b)=>b.v-a.v);
     mk("chart-state", "bar", byState.map(g=>g.k), byState.map(g=>g.v), "Trials");
+
+    const byBranch = groupCount(rows, "branch").sort((a,b)=>b.v-a.v);
+    mk("chart-branch", "bar", byBranch.map(g=>g.k), byBranch.map(g=>g.v), "Trials");
 
     // Histogram of trt_increase (bu/ac).
     const incs = rows.map(r => r.trt_increase).filter(v => v != null);
@@ -606,7 +620,7 @@
   }
 
   // ---------- WIRE FILTERS ----------
-  for (const id of ["f-year","f-crop","f-state","f-treatment-type","f-sales-rep"]) {
+  for (const id of ["f-year","f-crop","f-state","f-treatment-type","f-sales-rep","f-branch"]) {
     document.getElementById(id).addEventListener("change", render);
   }
   document.getElementById("f-search").addEventListener("input", render);
@@ -818,7 +832,7 @@
   // Note: size is set via the size_over_10 control (Yes/No) and translated to Large/Small.
   // Note: treatment_with_rate is rebuilt from the 5 product slots on save.
   const EDITABLE = [
-    "sales_rep","zip_code","state","location","latitude","longitude",
+    "sales_rep","branch","zip_code","state","location","latitude","longitude",
     "rep","spatial_data",
     "crop","treatment_type","growth_stage_applied","check_trt",
     "product_names",

@@ -40,6 +40,12 @@
           </label>
 
           <label class="block col-span-2">
+            <span class="lbl">Branch</span>
+            <input name="branch" type="text" class="inp" list="branch-suggest" autocomplete="off" />
+            <datalist id="branch-suggest"></datalist>
+          </label>
+
+          <label class="block col-span-2">
             <span class="lbl">Zip Code</span>
             <input name="zip_code" type="text" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" required class="inp" placeholder="e.g. 55104" />
             <span id="zip-resolved" class="mt-1 block text-xs text-stone-500">Enter a 5-digit US zip to look up location.</span>

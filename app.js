@@ -80,11 +80,21 @@
   form.elements.year.value = new Date().getFullYear();
   const rememberedRep = localStorage.getItem("sales_rep");
   if (rememberedRep) form.elements.sales_rep.value = rememberedRep;
+  const rememberedBranch = localStorage.getItem("branch");
+  if (rememberedBranch) form.elements.branch.value = rememberedBranch;
   const rememberedZip = localStorage.getItem("zip_code");
   if (rememberedZip) {
     form.elements.zip_code.value = rememberedZip;
     lookupZip(rememberedZip);
   }
+
+  // Branch suggestions: build a local history of branches this phone has used.
+  function refreshBranchSuggestions() {
+    const seen = JSON.parse(localStorage.getItem("branch_history") || "[]");
+    const dl = document.getElementById("branch-suggest");
+    dl.innerHTML = seen.map(b => `<option value="${String(b).replace(/"/g, "&quot;")}"></option>`).join("");
+  }
+  refreshBranchSuggestions();
 
   const num = (v) => {
     const n = parseFloat(v);
@@ -272,6 +282,7 @@
       latitude: zipResult && !zipResult.error ? zipResult.lat : null,
       longitude: zipResult && !zipResult.error ? zipResult.lng : null,
       sales_rep: f.sales_rep.value || null,
+      branch: f.branch.value || null,
       customer_info: f.customer_info.value || null,
       size: sizeStored,
       submitted_by: f.sales_rep.value || null,
@@ -288,6 +299,15 @@
     }
 
     localStorage.setItem("sales_rep", row.sales_rep ?? "");
+    if (row.branch) {
+      localStorage.setItem("branch", row.branch);
+      const hist = JSON.parse(localStorage.getItem("branch_history") || "[]");
+      if (!hist.includes(row.branch)) {
+        hist.unshift(row.branch);
+        localStorage.setItem("branch_history", JSON.stringify(hist.slice(0, 20)));
+        refreshBranchSuggestions();
+      }
+    }
     localStorage.setItem("zip_code", zip);
 
     setStatus("Submitted! Trial # will appear on the dashboard.", "ok");
@@ -296,11 +316,13 @@
     const keep = {
       year: f.year.value,
       sales_rep: f.sales_rep.value,
+      branch: f.branch.value,
       zip_code: f.zip_code.value,
     };
     form.reset();
     f.year.value = keep.year;
     f.sales_rep.value = keep.sales_rep;
+    f.branch.value = keep.branch;
     f.zip_code.value = keep.zip_code;
     if (keep.zip_code) showZipResult(zipCache[keep.zip_code] ?? { error: "stale" });
     resetProductRows();
