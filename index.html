@@ -114,10 +114,15 @@
             </datalist>
           </label>
 
-          <label class="block col-span-2">
-            <span class="lbl">Treatment w/ Rate</span>
-            <input name="treatment_with_rate" type="text" class="inp" placeholder="e.g. Avaris 2XS @ 4 oz + Coron @ 1 gal" />
-          </label>
+          <div class="col-span-2">
+            <span class="lbl">Products applied</span>
+            <div id="product-list" class="space-y-2"></div>
+            <button type="button" id="add-product"
+                    class="mt-2 rounded-lg border border-dashed border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 w-full hover:bg-stone-50">
+              + Add another product
+            </button>
+            <p class="mt-1 text-xs text-stone-500">Up to 5 products.</p>
+          </div>
         </div>
       </fieldset>
 

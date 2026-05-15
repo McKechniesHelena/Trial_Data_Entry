@@ -6,6 +6,76 @@
   const submitBtn = document.getElementById("submit-btn");
   const zipResolved = document.getElementById("zip-resolved");
 
+  // ---------- PRODUCT ROWS ----------
+  const MAX_PRODUCTS = 5;
+  const UNITS = ["gal", "fl oz", "lbs", "dry oz"];
+  const productList = document.getElementById("product-list");
+  const addProductBtn = document.getElementById("add-product");
+
+  function createProductRow() {
+    const row = document.createElement("div");
+    row.className = "product-row rounded-lg border border-stone-200 bg-stone-50 p-3 relative";
+    row.innerHTML = `
+      <button type="button" class="remove-product absolute top-2 right-2 text-stone-400 hover:text-red-600 text-lg leading-none px-1" aria-label="Remove product">×</button>
+      <label class="block mb-2">
+        <span class="lbl">Product</span>
+        <input type="text" class="inp product-name" placeholder="e.g. Avaris 2XS" />
+      </label>
+      <div class="grid grid-cols-2 gap-2">
+        <label class="block">
+          <span class="lbl">Rate</span>
+          <input type="number" step="any" inputmode="decimal" class="inp product-rate" />
+        </label>
+        <label class="block">
+          <span class="lbl">Unit</span>
+          <select class="inp product-unit">
+            <option value=""></option>
+            ${UNITS.map(u => `<option>${u}</option>`).join("")}
+          </select>
+        </label>
+      </div>
+    `;
+    row.querySelector(".remove-product").addEventListener("click", () => removeProductRow(row));
+    productList.appendChild(row);
+    syncProductControls();
+    return row;
+  }
+  function removeProductRow(row) {
+    if (productList.children.length <= 1) return;
+    row.remove();
+    syncProductControls();
+  }
+  function syncProductControls() {
+    const n = productList.children.length;
+    addProductBtn.disabled = n >= MAX_PRODUCTS;
+    addProductBtn.classList.toggle("opacity-50", n >= MAX_PRODUCTS);
+    productList.querySelectorAll(".remove-product").forEach(b => {
+      b.style.visibility = n > 1 ? "visible" : "hidden";
+    });
+  }
+  function resetProductRows() {
+    productList.innerHTML = "";
+    createProductRow();
+  }
+  function buildTreatmentString() {
+    const parts = [];
+    for (const row of productList.children) {
+      const name = row.querySelector(".product-name").value.trim();
+      if (!name) continue;
+      const rate = row.querySelector(".product-rate").value.trim();
+      const unit = row.querySelector(".product-unit").value.trim();
+      if (rate && unit) parts.push(`${name} @ ${rate} ${unit}`);
+      else if (rate) parts.push(`${name} @ ${rate}`);
+      else parts.push(name);
+    }
+    return parts.join(" + ");
+  }
+  addProductBtn.addEventListener("click", () => {
+    if (productList.children.length >= MAX_PRODUCTS) return;
+    createProductRow();
+  });
+  createProductRow(); // start with one row
+
   // Prefill year + remembered sales rep + zip.
   form.elements.year.value = new Date().getFullYear();
   const rememberedRep = localStorage.getItem("sales_rep");
@@ -164,7 +234,7 @@
       pct_increase,
       check_trt: f.check_trt.value || null,
       treatment_type: f.treatment_type.value || null,
-      treatment_with_rate: f.treatment_with_rate.value || null,
+      treatment_with_rate: buildTreatmentString() || null,
       product_cost: prodCost,
       application_cost: appCost,
       trt_cost,
@@ -210,6 +280,7 @@
     f.sales_rep.value = keep.sales_rep;
     f.zip_code.value = keep.zip_code;
     if (keep.zip_code) showZipResult(zipCache[keep.zip_code] ?? { error: "stale" });
+    resetProductRows();
     recalc();
     window.scrollTo({ top: 0, behavior: "smooth" });
   });
