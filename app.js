@@ -8,7 +8,7 @@
 
   // ---------- PRODUCT ROWS ----------
   const MAX_PRODUCTS = 5;
-  const UNITS = ["gal", "fl oz", "lbs", "dry oz"];
+  const UNITS = ["gal", "qt", "pt", "fl oz", "lbs", "dry oz"];
   const productList = document.getElementById("product-list");
   const addProductBtn = document.getElementById("add-product");
 

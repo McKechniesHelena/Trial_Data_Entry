@@ -830,7 +830,7 @@
     "latitude","longitude","check_yield","trt_yield","std_dev",
     "product_cost","application_cost",
   ]);
-  const UNITS = ["gal", "fl oz", "lbs", "dry oz"];
+  const UNITS = ["gal", "qt", "pt", "fl oz", "lbs", "dry oz"];
 
   // ----- Product slots inside the drawer -----
   const editProductList = document.getElementById("edit-product-list");
