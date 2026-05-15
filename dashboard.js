@@ -626,7 +626,7 @@
   document.getElementById("f-search").addEventListener("input", render);
 
   // ---------- CROP PRICES ----------
-  const priceInputs = { Corn: "p-corn", SB: "p-sb", Wheat: "p-wheat", Other: "p-other" };
+  const priceInputs = { Corn: "p-corn", SB: "p-sb", Wheat: "p-wheat", Alfalfa: "p-alfalfa", Other: "p-other" };
   function syncPriceInputs() {
     for (const [crop, id] of Object.entries(priceInputs)) {
       const el = document.getElementById(id);

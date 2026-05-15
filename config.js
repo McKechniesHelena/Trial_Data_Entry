@@ -13,6 +13,7 @@ window.APP_CONFIG = {
     Corn: 4,
     SB: 10,
     Wheat: 5,
+    Alfalfa: 0,
     Other: 0,
   },
 };
