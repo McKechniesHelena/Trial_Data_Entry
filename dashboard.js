@@ -594,10 +594,20 @@
   }
 
   // ---------- EXPORT ----------
+  // Include the structured product columns so round-tripping (export → import)
+  // preserves rates/units even though those columns aren't shown in the table.
+  const EXPORT_EXTRA = [
+    "product_1","rate_1","unit_1",
+    "product_2","rate_2","unit_2",
+    "product_3","rate_3","unit_3",
+    "product_4","rate_4","unit_4",
+    "product_5","rate_5","unit_5",
+  ];
+
   document.getElementById("export-csv").addEventListener("click", () => {
     const rows = getFiltered();
     if (!rows.length) { alert("No rows to export."); return; }
-    const headers = COLS.map(c => c[0]);
+    const headers = COLS.map(c => c[0]).concat(EXPORT_EXTRA);
     const csv = [headers.join(",")].concat(
       rows.map(r => headers.map(h => csvCell(r[h])).join(","))
     ).join("\n");
