@@ -14,6 +14,10 @@
   let sortKey = "key_id", sortDir = -1;
   let selectedProducts = new Set();
   let productExclusive = false;
+  // key: lowercased product, value: { min: number|null, max: number|null, unit: string|null }
+  let productRateFilters = {};
+  let ddProduct = "";  // lowercased
+  let ddUnit = "";     // exact match
   let costOverride = null; // number or null
   let cropPrices = loadCropPrices();
   let showDeleted = false;
@@ -115,9 +119,13 @@
     const { data, error } = await q;
     if (error) { alert("Error loading data: " + error.message); return; }
     allRows = data ?? [];
-    for (const r of allRows) r._products = rowProducts(r);
+    for (const r of allRows) {
+      r._slots = rowSlots(r);
+      r._products = r._slots.map(s => s.product);
+    }
     populateFilters(allRows);
     populateProductsList();
+    populateDeepDiveSelectors();
     render();
   }
 
@@ -131,14 +139,19 @@
   }
   // Prefer the structured product_1..5 columns; fall back to parsing
   // treatment_with_rate for any row not yet backfilled.
-  function rowProducts(r) {
+  function rowSlots(r) {
     const out = [];
     for (let i = 1; i <= 5; i++) {
       const p = r[`product_${i}`];
-      if (p && String(p).trim()) out.push(String(p).trim());
+      if (p && String(p).trim()) {
+        out.push({ product: String(p).trim(), rate: r[`rate_${i}`], unit: r[`unit_${i}`] });
+      }
     }
     if (out.length) return out;
-    return parseProducts(r.treatment_with_rate);
+    return parseProducts(r.treatment_with_rate).map(p => ({ product: p, rate: null, unit: null }));
+  }
+  function rowProducts(r) {
+    return (r._slots ?? []).map(s => s.product);
   }
 
   function uniqueProducts(rows) {
@@ -183,9 +196,22 @@
       if (ft && r.treatment_type !== ft) return false;
       if (fr && r.sales_rep !== fr) return false;
       if (sel.length) {
-        const rowSet = new Set((r._products ?? []).map(p => p.toLowerCase()));
-        if (!sel.every(p => rowSet.has(p))) return false;
-        if (productExclusive && rowSet.size !== sel.length) return false;
+        const slots = r._slots ?? [];
+        const slotByProduct = new Map(); // lc product -> slot
+        for (const s of slots) slotByProduct.set(s.product.toLowerCase(), s);
+
+        for (const p of sel) {
+          const slot = slotByProduct.get(p);
+          if (!slot) return false;
+          const rf = productRateFilters[p];
+          if (rf && (rf.min != null || rf.max != null || rf.unit)) {
+            if (slot.rate == null) return false;
+            if (rf.min != null && slot.rate < rf.min) return false;
+            if (rf.max != null && slot.rate > rf.max) return false;
+            if (rf.unit && (slot.unit ?? "").toLowerCase() !== rf.unit.toLowerCase()) return false;
+          }
+        }
+        if (productExclusive && slots.length !== sel.length) return false;
       }
       if (q) {
         const hay = [r.treatment_with_rate, r.product_names, r.customer_info, r.location, r.check_trt]
@@ -201,6 +227,7 @@
     const rows = getFiltered().map(applyPrices);
     renderKpis(rows);
     renderCharts(rows);
+    renderDeepDive(rows);
     renderTable(rows);
   }
 
@@ -320,6 +347,184 @@
       yCounts[i]++;
     }
     mk("chart-yield", "bar", yLabels, yCounts, "Count");
+  }
+
+  // ---------- DEEP DIVE ----------
+  function populateDeepDiveSelectors() {
+    const all = uniqueProducts(allRows);
+    const ddP = document.getElementById("dd-product");
+    const current = ddP.value;
+    ddP.innerHTML = '<option value="">— pick a product —</option>' +
+      all.map(p => `<option value="${escapeHtml(p.toLowerCase())}">${escapeHtml(p)}</option>`).join("");
+    if ([...ddP.options].some(o => o.value === current)) ddP.value = current;
+    else ddProduct = "";
+    refreshDeepDiveUnits();
+  }
+  function refreshDeepDiveUnits() {
+    const ddU = document.getElementById("dd-unit");
+    const units = new Set();
+    if (ddProduct) {
+      for (const r of allRows) {
+        for (const s of (r._slots ?? [])) {
+          if (s.product.toLowerCase() === ddProduct && s.unit) units.add(s.unit);
+        }
+      }
+    }
+    const list = [...units].sort();
+    const current = ddU.value;
+    ddU.innerHTML = '<option value="">any unit</option>' +
+      list.map(u => `<option>${escapeHtml(u)}</option>`).join("");
+    if ([...ddU.options].some(o => o.value === current)) ddU.value = current;
+    else ddUnit = "";
+  }
+
+  function pointsForDeepDive(rows) {
+    // Pull (rate, trt_increase, roi, label) for each row that has the chosen product (+ optional unit) with a numeric rate.
+    if (!ddProduct) return [];
+    const out = [];
+    for (const r of rows) {
+      for (const s of (r._slots ?? [])) {
+        if (s.product.toLowerCase() !== ddProduct) continue;
+        if (ddUnit && (s.unit ?? "") !== ddUnit) continue;
+        if (s.rate == null) continue;
+        out.push({
+          rate: +s.rate,
+          unit: s.unit ?? "",
+          delta: r.trt_increase,
+          roi: r.roi,
+          year: r.year,
+          crop: r.crop,
+          key: r.key_id,
+        });
+      }
+    }
+    return out;
+  }
+
+  function renderDeepDive(rows) {
+    const meta = document.getElementById("dd-meta");
+    const dispose = (id) => { if (charts[id]) { charts[id].destroy(); delete charts[id]; } };
+
+    if (!ddProduct) {
+      dispose("chart-scatter");
+      dispose("chart-winrate-by-rate");
+      meta.textContent = "Select a product to see rate-level analysis.";
+      return;
+    }
+    const points = pointsForDeepDive(rows);
+    meta.textContent = `${points.length} trial${points.length === 1 ? "" : "s"} with this product + numeric rate${ddUnit ? ` in ${ddUnit}` : ""}.`;
+
+    // --- Scatter: rate vs yield Δ ---
+    dispose("chart-scatter");
+    const scatterData = points.filter(p => p.delta != null).map(p => ({ x: p.rate, y: p.delta, _p: p }));
+    // Color by unit if mixed.
+    const uniqueUnits = [...new Set(points.map(p => p.unit))];
+    const unitColor = (u) => PALETTE[uniqueUnits.indexOf(u) % PALETTE.length] ?? PALETTE[0];
+    charts["chart-scatter"] = new Chart(document.getElementById("chart-scatter"), {
+      type: "scatter",
+      data: {
+        datasets: uniqueUnits.length > 1 && !ddUnit
+          ? uniqueUnits.map(u => ({
+              label: u || "(no unit)",
+              data: scatterData.filter(d => d._p.unit === u),
+              backgroundColor: rgba(unitColor(u), 0.7),
+              borderColor: rgba(unitColor(u), 1),
+              pointRadius: 5,
+            }))
+          : [{
+              label: "Trials",
+              data: scatterData,
+              backgroundColor: rgba(PALETTE[0], 0.7),
+              borderColor: rgba(PALETTE[0], 1),
+              pointRadius: 5,
+            }],
+      },
+      options: {
+        plugins: {
+          legend: { display: uniqueUnits.length > 1 && !ddUnit },
+          datalabels: { display: false },
+          tooltip: { callbacks: { label: (ctx) => {
+            const p = ctx.raw._p;
+            return `Key ${p.key} · rate ${p.rate}${p.unit ? " " + p.unit : ""} · Δ ${p.delta}`;
+          } } },
+        },
+        scales: {
+          x: { title: { display: true, text: `Rate${ddUnit ? ` (${ddUnit})` : ""}` } },
+          y: { title: { display: true, text: "Yield Δ (bu/ac)" } },
+        },
+      },
+    });
+
+    // --- Win rate by rate bucket ---
+    dispose("chart-winrate-by-rate");
+    const withRoi = points.filter(p => p.roi != null);
+    const labels = [], wins = [], totals = [];
+    if (withRoi.length > 0) {
+      const distinct = [...new Set(withRoi.map(p => +p.rate.toFixed(4)))].sort((a, b) => a - b);
+      if (distinct.length <= 6) {
+        // Use each distinct rate as its own bucket.
+        for (const r of distinct) {
+          const group = withRoi.filter(p => +p.rate.toFixed(4) === r);
+          labels.push(`${r}${ddUnit ? " " + ddUnit : ""}`);
+          wins.push(group.filter(p => p.roi > 0).length);
+          totals.push(group.length);
+        }
+      } else {
+        // Auto-bucket into 4 quartiles by rate.
+        const sorted = [...withRoi].sort((a, b) => a.rate - b.rate);
+        const q = (frac) => sorted[Math.min(sorted.length - 1, Math.floor(frac * sorted.length))].rate;
+        const cuts = [q(0.25), q(0.5), q(0.75)];
+        const bucketsRaw = [[], [], [], []];
+        for (const p of withRoi) {
+          let bi = 0;
+          if (p.rate >= cuts[2]) bi = 3;
+          else if (p.rate >= cuts[1]) bi = 2;
+          else if (p.rate >= cuts[0]) bi = 1;
+          bucketsRaw[bi].push(p);
+        }
+        const fmt = (v) => +v.toFixed(2);
+        labels.push(`<${fmt(cuts[0])}`);
+        labels.push(`${fmt(cuts[0])}–${fmt(cuts[1])}`);
+        labels.push(`${fmt(cuts[1])}–${fmt(cuts[2])}`);
+        labels.push(`≥${fmt(cuts[2])}`);
+        for (const bk of bucketsRaw) {
+          wins.push(bk.filter(p => p.roi > 0).length);
+          totals.push(bk.length);
+        }
+      }
+    }
+    const pct = totals.map((t, i) => t > 0 ? +(wins[i] / t * 100).toFixed(1) : 0);
+
+    charts["chart-winrate-by-rate"] = new Chart(document.getElementById("chart-winrate-by-rate"), {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [{
+          label: "Win rate",
+          data: pct,
+          backgroundColor: pct.map((_, i) => rgba(PALETTE[i % PALETTE.length], 0.75)),
+          borderColor: pct.map((_, i) => rgba(PALETTE[i % PALETTE.length], 1)),
+          borderWidth: 1,
+        }],
+      },
+      options: {
+        plugins: {
+          legend: { display: false },
+          datalabels: {
+            anchor: "end", align: "end", offset: 2, clip: false,
+            color: "rgb(28,25,23)", font: { weight: "600", size: 11 },
+            formatter: (v, ctx) => totals[ctx.dataIndex] > 0
+              ? `${v}% (${wins[ctx.dataIndex]}/${totals[ctx.dataIndex]})`
+              : "",
+          },
+        },
+        layout: { padding: { top: 22, bottom: 8 } },
+        scales: {
+          x: { title: { display: true, text: `Rate bucket${ddUnit ? ` (${ddUnit})` : ""}` } },
+          y: { beginAtZero: true, max: 100, title: { display: true, text: "% with ROI > 0" } },
+        },
+      },
+    });
   }
 
   function renderTable(rows) {
@@ -482,8 +687,10 @@
 
   pClear.addEventListener("click", () => {
     selectedProducts.clear();
+    productRateFilters = {};
     populateProductsList(pSearch.value);
     updateProductSummary();
+    renderRateFilters();
     updateOverrideVisibility();
     render();
   });
@@ -513,14 +720,72 @@
     pList.querySelectorAll('input[type="checkbox"]').forEach(cb => {
       cb.addEventListener("change", () => {
         const k = cb.dataset.key;
-        if (cb.checked) selectedProducts.add(k); else selectedProducts.delete(k);
+        if (cb.checked) {
+          selectedProducts.add(k);
+        } else {
+          selectedProducts.delete(k);
+          delete productRateFilters[k];
+        }
         updateProductSummary();
+        renderRateFilters();
         updateOverrideVisibility();
         render();
       });
     });
 
     pCount.textContent = String(selectedProducts.size);
+  }
+
+  function renderRateFilters() {
+    const wrap = document.getElementById("rate-filters");
+    const list = document.getElementById("rate-filters-list");
+    const sel = [...selectedProducts];
+    if (sel.length === 0) {
+      wrap.classList.add("hidden");
+      list.innerHTML = "";
+      return;
+    }
+    wrap.classList.remove("hidden");
+    const displayMap = new Map(uniqueProducts(allRows).map(p => [p.toLowerCase(), p]));
+    // Collect available units per product for nicer dropdowns.
+    const unitsByProduct = {};
+    for (const r of allRows) {
+      for (const s of (r._slots ?? [])) {
+        const key = s.product.toLowerCase();
+        if (!unitsByProduct[key]) unitsByProduct[key] = new Set();
+        if (s.unit) unitsByProduct[key].add(s.unit);
+      }
+    }
+    list.innerHTML = sel.map(p => {
+      const display = displayMap.get(p) ?? p;
+      const units = [...(unitsByProduct[p] ?? [])].sort();
+      const rf = productRateFilters[p] ?? {};
+      const unitOpts = `<option value="">any unit</option>` +
+        units.map(u => `<option value="${escapeHtml(u)}" ${rf.unit === u ? "selected" : ""}>${escapeHtml(u)}</option>`).join("");
+      return `
+        <div class="grid grid-cols-12 gap-1 items-center text-xs" data-product="${escapeHtml(p)}">
+          <span class="col-span-4 truncate font-medium text-stone-800" title="${escapeHtml(display)}">${escapeHtml(display)}</span>
+          <input class="rate-min inp !py-1 col-span-2 text-xs" placeholder="min" type="number" step="any" value="${rf.min ?? ""}" />
+          <input class="rate-max inp !py-1 col-span-2 text-xs" placeholder="max" type="number" step="any" value="${rf.max ?? ""}" />
+          <select class="rate-unit inp !py-1 col-span-4 text-xs">${unitOpts}</select>
+        </div>`;
+    }).join("");
+
+    list.querySelectorAll("[data-product]").forEach(row => {
+      const p = row.dataset.product;
+      const readAndRender = () => {
+        const minRaw = row.querySelector(".rate-min").value.trim();
+        const maxRaw = row.querySelector(".rate-max").value.trim();
+        const unit = row.querySelector(".rate-unit").value.trim();
+        const min = minRaw ? parseFloat(minRaw) : null;
+        const max = maxRaw ? parseFloat(maxRaw) : null;
+        if (min == null && max == null && !unit) delete productRateFilters[p];
+        else productRateFilters[p] = { min: Number.isFinite(min) ? min : null, max: Number.isFinite(max) ? max : null, unit: unit || null };
+        render();
+      };
+      row.querySelectorAll("input, select").forEach(el => el.addEventListener("input", readAndRender));
+      row.querySelectorAll("select").forEach(el => el.addEventListener("change", readAndRender));
+    });
   }
 
   function updateProductSummary() {
@@ -804,6 +1069,17 @@
     if (error) { setEditStatus("Error: " + error.message, "err"); return; }
     await loadData();
     closeDrawer();
+  });
+
+  // ---------- DEEP DIVE WIRING ----------
+  document.getElementById("dd-product").addEventListener("change", (e) => {
+    ddProduct = e.target.value;
+    refreshDeepDiveUnits();
+    render();
+  });
+  document.getElementById("dd-unit").addEventListener("change", (e) => {
+    ddUnit = e.target.value;
+    render();
   });
 
   // ---------- SHOW DELETED TOGGLE ----------
