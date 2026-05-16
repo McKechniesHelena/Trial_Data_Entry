@@ -22,6 +22,14 @@
   let cropPrices = loadCropPrices();
   let showDeleted = false;
 
+  // Anything outside the standard four is bucketed into "Other" for filters
+  // and crop-grouped charts. The table column still shows the original value
+  // so you can tell what's in the bucket.
+  const STANDARD_CROPS = new Set(["Corn", "SB", "Wheat", "Alfalfa"]);
+  function normalizeCrop(c) {
+    return STANDARD_CROPS.has(c) ? c : "Other";
+  }
+
   function costOverrideActive() {
     return productExclusive && selectedProducts.size > 0 && Number.isFinite(costOverride);
   }
@@ -38,7 +46,7 @@
 
   // Recompute $-derived fields using current cropPrices (and cost override if active).
   function applyPrices(r) {
-    const price = cropPrices[r.crop];
+    const price = cropPrices[normalizeCrop(r.crop)];
     const out = { ...r };
     if (Number.isFinite(price) && r.trt_increase != null) {
       out.dollar_per_acre_increase = +(r.trt_increase * price).toFixed(2);
@@ -123,6 +131,7 @@
     for (const r of allRows) {
       r._slots = rowSlots(r);
       r._products = r._slots.map(s => s.product);
+      r._cropNorm = normalizeCrop(r.crop);
     }
     populateFilters(allRows);
     populateProductsList();
@@ -174,8 +183,18 @@
         [...new Set(vals.filter(Boolean))].sort().map(v => `<option>${escapeHtml(String(v))}</option>`).join("");
       sel.value = current;
     };
+    // Same idea but the option order is fixed (used for crop buckets).
+    // Only includes options that have at least one row in `present`.
+    const fillFixed = (id, order, present) => {
+      const sel = document.getElementById(id);
+      const current = sel.value;
+      const seen = new Set(present.filter(Boolean));
+      sel.innerHTML = '<option value="">All</option>' +
+        order.filter(v => seen.has(v)).map(v => `<option>${escapeHtml(v)}</option>`).join("");
+      sel.value = current;
+    };
     fill("f-year", rows.map(r => r.year));
-    fill("f-crop", rows.map(r => r.crop));
+    fillFixed("f-crop", ["Corn", "SB", "Wheat", "Alfalfa", "Other"], rows.map(r => r._cropNorm));
     fill("f-state", rows.map(r => r.state));
     fill("f-treatment-type", rows.map(r => r.treatment_type));
     fill("f-sales-rep", rows.map(r => r.sales_rep));
@@ -201,7 +220,7 @@
 
     return allRows.filter(r => {
       if (fy && String(r.year) !== fy) return false;
-      if (fc && r.crop !== fc) return false;
+      if (fc && r._cropNorm !== fc) return false;
       if (fs && r.state !== fs) return false;
       if (ft && r.treatment_type !== ft) return false;
       if (fr && r.sales_rep !== fr) return false;
@@ -336,7 +355,7 @@
       });
     };
 
-    const byCrop = groupAvg(rows, "crop", "trt_increase").sort((a,b)=>b.v-a.v);
+    const byCrop = groupAvg(rows, "_cropNorm", "trt_increase").sort((a,b)=>b.v-a.v);
     mk("chart-crop", "bar", byCrop.map(g=>`${g.k} (n=${g.n})`), byCrop.map(g=>+g.v.toFixed(2)), "Avg Yield Δ");
 
     const byTrt = groupAvg(rows, "treatment_type", "trt_increase").sort((a,b)=>b.v-a.v);
