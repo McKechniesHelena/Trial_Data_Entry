@@ -368,8 +368,25 @@
     const byTrt = groupAvg(rows, "treatment_type", "trt_increase").sort((a,b)=>b.v-a.v);
     mk("chart-trt", "bar", byTrt.map(g=>`${g.k} (n=${g.n})`), byTrt.map(g=>+g.v.toFixed(2)), "Avg Yield Δ");
 
-    const byState = groupCount(rows, "state").sort((a,b)=>b.v-a.v);
-    mk("chart-state", "bar", byState.map(g=>g.k), byState.map(g=>g.v), "Trials");
+    // Yield impact by product: each trial counts toward every product it used.
+    // Requires trt_increase and at least 2 samples per product (filters noise).
+    const productImpact = new Map();
+    for (const r of rows) {
+      if (r.trt_increase == null) continue;
+      for (const s of (r._slots ?? [])) {
+        if (!s.product) continue;
+        if (!productImpact.has(s.product)) productImpact.set(s.product, []);
+        productImpact.get(s.product).push(r.trt_increase);
+      }
+    }
+    const byProductImpact = [...productImpact.entries()]
+      .map(([k, arr]) => ({ k, v: avg(arr), n: arr.length }))
+      .filter(g => g.n >= 2)
+      .sort((a, b) => b.v - a.v);
+    mk("chart-product-impact", "bar",
+       byProductImpact.map(g => `${g.k} (n=${g.n})`),
+       byProductImpact.map(g => +g.v.toFixed(2)),
+       "Avg Yield Δ");
 
     const byBranch = groupCount(rows, "branch").sort((a,b)=>b.v-a.v);
     mk("chart-branch", "bar", byBranch.map(g=>g.k), byBranch.map(g=>g.v), "Trials");
