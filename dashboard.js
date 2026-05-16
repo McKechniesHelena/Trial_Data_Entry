@@ -629,7 +629,9 @@
   document.getElementById("export-csv").addEventListener("click", () => {
     const rows = getFiltered();
     if (!rows.length) { alert("No rows to export."); return; }
-    const headers = COLS.map(c => c[0]).concat(EXPORT_EXTRA);
+    // 'id' (UUID primary key) leads the export so a round-trip via CSV
+    // upserts by id rather than duplicating rows.
+    const headers = ["id", ...COLS.map(c => c[0]), ...EXPORT_EXTRA];
     const csv = [headers.join(",")].concat(
       rows.map(r => headers.map(h => csvCell(r[h])).join(","))
     ).join("\n");
@@ -1172,6 +1174,7 @@
 
   // ---------- CSV IMPORT ----------
   const IMPORT_TEXT = new Set([
+    "id",
     "sales_rep","branch","state","location","zip_code",
     "crop","treatment_type","growth_stage_applied","check_trt",
     "treatment_with_rate","product_names","customer_info",
@@ -1189,7 +1192,7 @@
     "latitude","longitude",
     "rate_1","rate_2","rate_3","rate_4","rate_5",
   ]);
-  const IMPORT_SKIP = new Set(["id","created_at","deleted_at","submitted_by"]);
+  const IMPORT_SKIP = new Set(["created_at","deleted_at","submitted_by"]);
 
   const importBackdrop = document.getElementById("import-backdrop");
   const importModal = document.getElementById("import-modal");
@@ -1345,9 +1348,13 @@
     if (skippedEmpty) importedIssues.push(`Skipped ${skippedEmpty} blank row(s).`);
 
     importSummary.classList.remove("hidden");
+    const withId = importedRows.filter(r => r.id).length;
+    const withoutId = importedRows.length - withId;
     importSummary.innerHTML = `
-      <div><strong>${importedRows.length}</strong> row${importedRows.length === 1 ? "" : "s"} ready to import.</div>
-      <div class="text-xs text-stone-500">Trial # / Key ID will be auto-assigned. Derived \$-fields are recomputed from raw inputs.</div>
+      <div><strong>${importedRows.length}</strong> row${importedRows.length === 1 ? "" : "s"} ready
+        — <strong>${withId}</strong> will update existing rows (matched by id),
+        <strong>${withoutId}</strong> will be inserted as new.</div>
+      <div class="text-xs text-stone-500">For new rows, Trial # / Key ID auto-assign. Derived \$-fields are recomputed from raw inputs.</div>
     `;
     if (importedIssues.length) {
       importIssues.classList.remove("hidden");
@@ -1381,7 +1388,11 @@
       const chunk = importedRows.slice(i, i + chunkSize);
       importStatus.textContent = `Importing ${i + 1}–${Math.min(i + chunk.length, total)} of ${total}…`;
       importStatus.className = "text-sm text-stone-600";
-      const { error } = await supabase.from("trials").insert(chunk);
+      // Upsert by id: rows with a matching id are UPDATED in place; rows
+      // without an id INSERT and get a fresh UUID + trigger-assigned trial_num.
+      const { error } = await supabase
+        .from("trials")
+        .upsert(chunk, { onConflict: "id" });
       if (error) {
         failed += chunk.length;
         importedIssues.push(`Chunk ${i / chunkSize + 1} failed: ${error.message}`);
