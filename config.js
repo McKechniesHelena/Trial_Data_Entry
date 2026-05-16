@@ -11,7 +11,7 @@ window.APP_CONFIG = {
   // Crop -> $/bu, used to calculate $/A Increase (matches your vlookup sheet).
   CROP_PRICE: {
     Corn: 4,
-    SB: 10,
+    Soybeans: 10,
     Wheat: 5,
     Alfalfa: 0,
     Other: 0,

@@ -25,9 +25,16 @@
   // Anything outside the standard four is bucketed into "Other" for filters
   // and crop-grouped charts. The table column still shows the original value
   // so you can tell what's in the bucket.
-  const STANDARD_CROPS = new Set(["Corn", "SB", "Wheat", "Alfalfa"]);
+  const STANDARD_CROPS = new Set(["Corn", "Soybeans", "Wheat", "Alfalfa"]);
+  // Legacy data and old CSVs sometimes use 'SB'. Treat it as Soybeans
+  // everywhere on the dashboard.
+  function canonicalCrop(c) {
+    if (c === "SB" || c === "sb") return "Soybeans";
+    return c;
+  }
   function normalizeCrop(c) {
-    return STANDARD_CROPS.has(c) ? c : "Other";
+    const canon = canonicalCrop(c);
+    return STANDARD_CROPS.has(canon) ? canon : "Other";
   }
 
   function costOverrideActive() {
@@ -194,7 +201,7 @@
       sel.value = current;
     };
     fill("f-year", rows.map(r => r.year));
-    fillFixed("f-crop", ["Corn", "SB", "Wheat", "Alfalfa", "Other"], rows.map(r => r._cropNorm));
+    fillFixed("f-crop", ["Corn", "Soybeans", "Wheat", "Alfalfa", "Other"], rows.map(r => r._cropNorm));
     fill("f-state", rows.map(r => r.state));
     fill("f-treatment-type", rows.map(r => r.treatment_type));
     fill("f-sales-rep", rows.map(r => r.sales_rep));
@@ -660,7 +667,7 @@
   document.getElementById("f-search").addEventListener("input", render);
 
   // ---------- CROP PRICES ----------
-  const priceInputs = { Corn: "p-corn", SB: "p-sb", Wheat: "p-wheat", Alfalfa: "p-alfalfa", Other: "p-other" };
+  const priceInputs = { Corn: "p-corn", Soybeans: "p-sb", Wheat: "p-wheat", Alfalfa: "p-alfalfa", Other: "p-other" };
   function syncPriceInputs() {
     for (const [crop, id] of Object.entries(priceInputs)) {
       const el = document.getElementById(id);
@@ -1337,6 +1344,7 @@
       }
       if (Object.keys(row).length === 0) { skippedEmpty++; continue; }
       if (row.year == null) { skippedNoYear++; continue; }
+      if (row.crop) row.crop = canonicalCrop(row.crop);
       const hasSlots = [1,2,3,4,5].some(i => row[`product_${i}`]);
       if (hasSlots) row.treatment_with_rate = buildTreatmentFromSlots(row);
       if (row.trial_num == null) delete row.key_id;
