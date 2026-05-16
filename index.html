@@ -138,16 +138,36 @@
       <!-- Section: Yield Results -->
       <fieldset class="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
         <legend class="px-2 text-sm font-semibold text-stone-700">Yield Results</legend>
-        <p id="yield-units-hint" class="mb-2 text-xs text-stone-500">Enter yields in bu/ac.</p>
+
+        <label class="block mb-3">
+          <span class="lbl">Harvested as</span>
+          <select name="harvest_type" required class="inp">
+            <option value="">—</option>
+            <option>Grain</option>
+            <option>Silage</option>
+            <option>Feed</option>
+          </select>
+        </label>
+
+        <p id="yield-units-hint" class="mb-2 text-xs text-stone-500">Pick a harvest type above.</p>
 
         <div class="grid grid-cols-2 gap-3">
           <label class="block">
-            <span class="lbl">Check Yield</span>
+            <span class="lbl" id="lbl-check-yield">Check Yield</span>
             <input name="check_yield" type="number" step="any" inputmode="decimal" class="inp" />
           </label>
           <label class="block">
-            <span class="lbl">TRT Yield</span>
+            <span class="lbl" id="lbl-trt-yield">TRT Yield</span>
             <input name="trt_yield" type="number" step="any" inputmode="decimal" class="inp" />
+          </label>
+
+          <label class="block moisture-field hidden">
+            <span class="lbl">Check Moisture %</span>
+            <input name="check_moisture" type="number" step="any" inputmode="decimal" class="inp" />
+          </label>
+          <label class="block moisture-field hidden">
+            <span class="lbl">TRT Moisture %</span>
+            <input name="trt_moisture" type="number" step="any" inputmode="decimal" class="inp" />
           </label>
 
           <label class="block">

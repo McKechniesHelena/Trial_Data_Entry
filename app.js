@@ -203,20 +203,45 @@
     f.roi.value = roi != null ? `${(roi * 100).toFixed(0)}%` : "";
   }
 
-  // Yield-units hint flips when Crop = Alfalfa.
+  // Yield labels + moisture visibility are driven by Harvested as (harvest_type).
   const yieldHint = document.getElementById("yield-units-hint");
-  function updateYieldHint() {
-    const crop = form.elements.crop.value;
-    if (crop === "Alfalfa") {
-      yieldHint.textContent = "Enter yields in tons/ac (Alfalfa).";
+  function yieldUnitFor(ht) {
+    if (ht === "Grain") return "bu/ac";
+    if (ht === "Silage" || ht === "Feed") return "tons/ac";
+    return null;
+  }
+  function dbUnitFor(ht) {
+    if (ht === "Grain") return "bushel";
+    if (ht === "Silage" || ht === "Feed") return "tons";
+    return null;
+  }
+  function updateHarvestUi() {
+    const ht = form.elements.harvest_type.value;
+    const units = yieldUnitFor(ht);
+    const showMoisture = ht === "Grain" || ht === "Silage";
+
+    document.getElementById("lbl-check-yield").textContent = units ? `Check Yield (${units})` : "Check Yield";
+    document.getElementById("lbl-trt-yield").textContent   = units ? `TRT Yield (${units})`   : "TRT Yield";
+
+    for (const el of document.querySelectorAll(".moisture-field")) {
+      el.classList.toggle("hidden", !showMoisture);
+    }
+    // Clear moisture inputs if hidden so we don't send stale values.
+    if (!showMoisture) {
+      form.elements.check_moisture.value = "";
+      form.elements.trt_moisture.value = "";
+    }
+
+    if (units) {
+      yieldHint.textContent = `Enter yields in ${units}.` + (showMoisture ? " Moisture % goes in the row below." : "");
       yieldHint.className = "mb-2 text-xs text-emerald-700 font-medium";
     } else {
-      yieldHint.textContent = "Enter yields in bu/ac.";
+      yieldHint.textContent = "Pick a harvest type above.";
       yieldHint.className = "mb-2 text-xs text-stone-500";
     }
   }
-  form.elements.crop.addEventListener("change", updateYieldHint);
-  updateYieldHint();
+  form.elements.harvest_type.addEventListener("change", updateHarvestUi);
+  updateHarvestUi();
 
   form.addEventListener("input", recalc);
   form.addEventListener("change", recalc);
@@ -283,9 +308,18 @@
     const sizeOver10 = f.size_over_10.value;
     const sizeStored = sizeOver10 === "Yes" ? "Large" : sizeOver10 === "No" ? "Small" : null;
 
+    const harvestType = f.harvest_type.value || null;
+    const yieldUnit = dbUnitFor(harvestType);
+    const checkMoist = num(f.check_moisture.value);
+    const trtMoist = num(f.trt_moisture.value);
+
     const row = {
       // trial_num + key_id are filled in by a Postgres trigger
       ...productCols,
+      harvest_type: harvestType,
+      yield_unit: yieldUnit,
+      check_moisture: checkMoist,
+      trt_moisture: trtMoist,
       rep: f.rep.value || null,
       crop: f.crop.value || null,
       check_yield: checkY,
@@ -345,14 +379,17 @@
       sales_rep: f.sales_rep.value,
       branch: f.branch.value,
       zip_code: f.zip_code.value,
+      harvest_type: f.harvest_type.value,
     };
     form.reset();
     f.year.value = keep.year;
     f.sales_rep.value = keep.sales_rep;
     f.branch.value = keep.branch;
     f.zip_code.value = keep.zip_code;
+    f.harvest_type.value = keep.harvest_type;
     if (keep.zip_code) showZipResult(zipCache[keep.zip_code] ?? { error: "stale" });
     resetProductRows();
+    updateHarvestUi();
     recalc();
     window.scrollTo({ top: 0, behavior: "smooth" });
   });

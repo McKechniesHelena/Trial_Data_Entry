@@ -849,12 +849,14 @@
     "rep","spatial_data",
     "crop","treatment_type","growth_stage_applied","check_trt",
     "product_names",
-    "check_yield","trt_yield","std_dev",
+    "harvest_type",
+    "check_yield","trt_yield","check_moisture","trt_moisture","std_dev",
     "product_cost","application_cost",
     "customer_info",
   ];
   const NUMERIC = new Set([
     "latitude","longitude","check_yield","trt_yield","std_dev",
+    "check_moisture","trt_moisture",
     "product_cost","application_cost",
   ]);
   const UNITS = ["gal", "qt", "pt", "fl oz", "lbs", "dry oz"];
@@ -901,6 +903,31 @@
       if (m) return { product: m[1].trim(), rate: parseFloat(m[2]), unit: m[3].trim() || null };
       return { product: part.trim(), rate: null, unit: null };
     });
+  }
+
+  function editYieldUnitFor(ht) {
+    if (ht === "Grain") return "bu/ac";
+    if (ht === "Silage" || ht === "Feed") return "tons/ac";
+    return null;
+  }
+  function editDbUnitFor(ht) {
+    if (ht === "Grain") return "bushel";
+    if (ht === "Silage" || ht === "Feed") return "tons";
+    return null;
+  }
+  function updateEditHarvestUi() {
+    const ht = editForm.elements.harvest_type.value;
+    const units = editYieldUnitFor(ht);
+    const showMoisture = ht === "Grain" || ht === "Silage";
+    document.getElementById("edit-lbl-check-yield").textContent = units ? `Check Yield (${units})` : "Check Yield";
+    document.getElementById("edit-lbl-trt-yield").textContent   = units ? `TRT Yield (${units})`   : "TRT Yield";
+    for (const el of editForm.querySelectorAll(".edit-moisture-field")) {
+      el.classList.toggle("hidden", !showMoisture);
+    }
+    if (!showMoisture) {
+      editForm.elements.check_moisture.value = "";
+      editForm.elements.trt_moisture.value = "";
+    }
   }
 
   function loadEditProductSlots(row) {
@@ -969,6 +996,7 @@
       row.size === "Large" ? "Yes" : row.size === "Small" ? "No" : "";
 
     loadEditProductSlots(row);
+    updateEditHarvestUi();
 
     drawer.classList.remove("hidden");
     backdrop.classList.remove("hidden");
@@ -1005,6 +1033,7 @@
   document.getElementById("edit-close").addEventListener("click", closeDrawer);
   document.getElementById("edit-cancel").addEventListener("click", closeDrawer);
   backdrop.addEventListener("click", closeDrawer);
+  editForm.elements.harvest_type.addEventListener("change", updateEditHarvestUi);
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !drawer.classList.contains("hidden")) closeDrawer();
   });
@@ -1046,6 +1075,12 @@
     // Size mapping (Yes/No -> Large/Small).
     const sizeChoice = editForm.elements.size_over_10.value;
     update.size = sizeChoice === "Yes" ? "Large" : sizeChoice === "No" ? "Small" : null;
+    // Derive yield_unit from harvest_type; clear moisture if the type doesn't use it.
+    update.yield_unit = editDbUnitFor(update.harvest_type ?? null);
+    if (update.harvest_type !== "Grain" && update.harvest_type !== "Silage") {
+      update.check_moisture = null;
+      update.trt_moisture = null;
+    }
     // Pull the structured product slots and rebuild treatment_with_rate.
     Object.assign(update, gatherEditProductSlots());
     // Recompute derived $-fields from new raw inputs.
@@ -1122,12 +1157,14 @@
     "crop","treatment_type","growth_stage_applied","check_trt",
     "treatment_with_rate","product_names","customer_info",
     "rep","spatial_data","size",
+    "harvest_type","yield_unit",
     "product_1","unit_1","product_2","unit_2","product_3","unit_3",
     "product_4","unit_4","product_5","unit_5",
   ]);
   const IMPORT_NUMERIC = new Set([
     "year","trial_num","key_id",
     "check_yield","trt_yield","trt_increase","pct_increase","std_dev",
+    "check_moisture","trt_moisture",
     "product_cost","application_cost","trt_cost",
     "dollar_per_acre_increase","net_per_acre","roi",
     "latitude","longitude",

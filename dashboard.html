@@ -338,11 +338,22 @@
       <!-- Yield -->
       <fieldset class="rounded-xl border border-stone-200 p-3">
         <legend class="px-2 text-xs font-semibold text-stone-700">Yield</legend>
+        <label class="block mb-2"><span class="lbl">Harvested as</span>
+          <select name="harvest_type" class="inp">
+            <option value="">—</option>
+            <option>Grain</option>
+            <option>Silage</option>
+            <option>Feed</option>
+          </select></label>
         <div class="grid grid-cols-2 gap-3">
-          <label class="block"><span class="lbl">Check Yield</span>
+          <label class="block"><span class="lbl" id="edit-lbl-check-yield">Check Yield</span>
             <input name="check_yield" type="number" step="any" class="inp" /></label>
-          <label class="block"><span class="lbl">TRT Yield</span>
+          <label class="block"><span class="lbl" id="edit-lbl-trt-yield">TRT Yield</span>
             <input name="trt_yield" type="number" step="any" class="inp" /></label>
+          <label class="block edit-moisture-field hidden"><span class="lbl">Check Moisture %</span>
+            <input name="check_moisture" type="number" step="any" class="inp" /></label>
+          <label class="block edit-moisture-field hidden"><span class="lbl">TRT Moisture %</span>
+            <input name="trt_moisture" type="number" step="any" class="inp" /></label>
           <label class="block"><span class="lbl">Std. Dev.</span>
             <input name="std_dev" type="number" step="any" class="inp" /></label>
         </div>
