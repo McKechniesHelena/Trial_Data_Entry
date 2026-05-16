@@ -21,17 +21,9 @@
         <legend class="px-2 text-sm font-semibold text-stone-700">Basic Info</legend>
 
         <div class="grid grid-cols-2 gap-3">
-          <label class="block">
+          <label class="block col-span-2">
             <span class="lbl">Year</span>
             <input name="year" type="number" inputmode="numeric" required class="inp" />
-          </label>
-          <label class="block">
-            <span class="lbl">Over 10 acres?</span>
-            <select name="size_over_10" class="inp">
-              <option value="">—</option>
-              <option value="Yes">Yes</option>
-              <option value="No">No</option>
-            </select>
           </label>
 
           <label class="block col-span-2">
@@ -49,13 +41,6 @@
             <span class="lbl">Zip Code</span>
             <input name="zip_code" type="text" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" required class="inp" placeholder="e.g. 55104" />
             <span id="zip-resolved" class="mt-1 block text-xs text-stone-500">Enter a 5-digit US zip to look up location.</span>
-          </label>
-
-          <label class="block col-span-2">
-            <span class="lbl">Replicated?</span>
-            <select name="rep" class="inp">
-              <option>No</option><option>Yes</option>
-            </select>
           </label>
         </div>
 
@@ -94,6 +79,22 @@
               <option>Fertility</option>
               <option>Broadcast</option>
               <option>Other - See Notes</option>
+            </select>
+          </label>
+
+          <label class="block">
+            <span class="lbl">Over 10 acres?</span>
+            <select name="size_over_10" class="inp">
+              <option value="">—</option>
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </label>
+
+          <label class="block">
+            <span class="lbl">Replicated?</span>
+            <select name="rep" class="inp">
+              <option>No</option><option>Yes</option>
             </select>
           </label>
 
