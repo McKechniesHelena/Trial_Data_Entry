@@ -2,8 +2,8 @@
 *.xlsx
 *.xls
 
-# CSV exports — already imported, no need on public web.
-existing_trials.csv
+# CSV imports/exports — trial data should never be tracked in git.
+*.csv
 
 # OS / editor
 .DS_Store
